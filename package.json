@@ -1,0 +1,29 @@
+{
+  "name": "comm-server",
+  "version": "0.0.0",
+  "description": "",
+  "scripts": {
+    "build-client": "parcel build -t browser src/client.ts --out-file dist/client.js; cp index.html dist",
+    "build-server": "parcel build -t node src/server.ts --out-file dist/server.js",
+    "start": "npm run build-client; npm run build-server; node dist/server.js",
+    "test": "jest"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "webrtc-adapter": "^7.4.0"
+  },
+  "devDependencies": {
+    "@types/node-static": "^0.7.3",
+    "@types/socket.io": "^2.1.4",
+    "@types/uuid": "^3.4.6",
+    "@types/ws": "^7.2.0",
+    "http": "0.0.0",
+    "jest": "^24.9.0",
+    "node-static": "^0.7.11",
+    "parcel": "^1.12.4",
+    "typescript": "^3.7.5",
+    "uuid": "^3.4.0",
+    "ws": "^7.2.1"
+  }
+}
