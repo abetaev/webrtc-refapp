@@ -3,8 +3,10 @@
   "version": "0.0.0",
   "description": "",
   "scripts": {
+    "clean": "rm -r dist .cache node_modules",
     "build-client": "parcel build -t browser src/client.ts --out-file dist/client.js; cp index.html dist",
     "build-server": "parcel build -t node src/server.ts --out-file dist/server.js",
+    "prestart": "npm ci",
     "start": "npm run build-client; npm run build-server; node dist/server.js",
     "test": "jest"
   },

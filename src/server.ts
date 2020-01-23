@@ -36,12 +36,12 @@ wsServer.on('connection', (socket, request) => {
         delete hosts[invitation]
         console.log(`accept ${invitation}`)
       } else {
-        socket.send(stringify({ type: "error", data: "void" }))
+        socket.send(stringify({ type: "error", code: "void" }))
         socket.close()
       }
       break;
     default:
-      socket.send(stringify({ type: "error", data: "unsupported" }))
+      socket.send(stringify({ type: "error", code: "unsupported" }))
       socket.close()
   }
 
@@ -54,15 +54,11 @@ wsServer.on('error', error => {
 
 function meet(host: WebSocket, guest: WebSocket) {
 
-  host.send(stringify({ type: "ready" }));
-
   [[host, guest], [guest, host]].forEach(
-    ([from, to]) => {
-      from.on('message', data => {
-        to.send(data)
-      })
-    }
+    ([from, to]) => from.on('message', data => {
+      console.log(`${from === host ? 'host' : 'guest'}: ${stringify(data)}`)
+      to.send(data)
+    })
   );
 
 }
-
