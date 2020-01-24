@@ -1,14 +1,16 @@
 // config
 
-const configuration = {
-  'iceServers': [{
-    'urls': 'stun:stun.l.google.com:19302'
+const configuration: RTCConfiguration = {
+  iceServers: [{
+    // urls: ['stun:127.0.0.1:3478', 'stun:127.0.0.1:3479']
+    // }, {
+    urls: 'stun:stun.l.google.com:19302'
   }]
 };
 
 // page parameters
 
-const invitation = new URL(document.URL).searchParams.get("invitation") || undefined
+const invitation = new URL(document.URL).searchParams.get("invitation") || ""
 
 if (invitation) {
   console.log(`joining ${invitation}`)
@@ -17,7 +19,7 @@ if (invitation) {
 }
 
 // websocket to the signaling server
-const socket = new WebSocket(`ws://localhost:8080/meet${invitation ? `/${invitation}` : ''}`)
+const socket = new WebSocket(`ws://localhost:8080/${invitation}`)
 
 // creating P2P connection
 const peerConn = new RTCPeerConnection(configuration);
@@ -92,11 +94,14 @@ socket.onmessage = async ({ data: signallingMessage }: MessageEvent) => {
   switch (type) {
 
     case "invitation":
+
       link = document.createElement('a')
       const { invitation } = event
       link.href = `http://localhost:8080/?invitation=${invitation}`
       link.innerText = 'link'
+      link.target = '_blank'
       document.body.appendChild(link)
+
       break;
 
     case 'candidate':
@@ -150,8 +155,6 @@ socket.onmessage = async ({ data: signallingMessage }: MessageEvent) => {
       // 11. The recipient uses the signaling server to send the answer to the caller.
       sendMessage(answer)
 
-      // socket.close()
-
       break;
 
     case 'answer':
@@ -162,8 +165,6 @@ socket.onmessage = async ({ data: signallingMessage }: MessageEvent) => {
       //     to flow as configured.
       console.log('answer')
       await peerConn.setRemoteDescription(new RTCSessionDescription(event));
-
-      // socket.close()
 
       break;
 

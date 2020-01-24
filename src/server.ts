@@ -21,30 +21,20 @@ const wsServer = new Server({ server: rootServer });
 const hosts: { [invitation: string]: WebSocket } = {}
 
 wsServer.on('connection', (socket, request) => {
-  const [_, action, ...args] = request.url.split('/')
-
-  switch (action) {
-    case "meet":
-      let [invitation] = args
-      if (!invitation) {
-        invitation = uuid()
-        hosts[invitation] = socket
-        socket.send(stringify({ type: "invitation", invitation }))
-        console.log(`create ${invitation}`)
-      } else if (hosts[invitation]) {
-        meet(hosts[invitation], socket)
-        delete hosts[invitation]
-        console.log(`accept ${invitation}`)
-      } else {
-        socket.send(stringify({ type: "error", code: "void" }))
-        socket.close()
-      }
-      break;
-    default:
-      socket.send(stringify({ type: "error", code: "unsupported" }))
-      socket.close()
+  let [,invitation] = request.url.split('/')
+  if (!invitation) {
+    invitation = uuid()
+    hosts[invitation] = socket
+    socket.send(stringify({ type: "invitation", invitation }))
+    console.log(`create ${invitation}`)
+  } else if (hosts[invitation]) {
+    meet(hosts[invitation], socket)
+    delete hosts[invitation]
+    console.log(`accept ${invitation}`)
+  } else {
+    socket.send(stringify({ type: "error", code: "void" }))
+    socket.close()
   }
-
 })
 
 wsServer.on('error', error => {
