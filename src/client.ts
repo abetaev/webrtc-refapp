@@ -1,3 +1,5 @@
+require('webrtc-adapter')
+
 // config
 
 const configuration: RTCConfiguration = {
