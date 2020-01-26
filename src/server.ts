@@ -1,17 +1,23 @@
-// HTTP
+// HTTPS
 
-import http from 'http'
+import https from 'https'
 import { Server as FileServer } from 'node-static'
+import fs from 'fs'
 
 const fileServer = new FileServer("./dist")
 
-const rootServer = http.createServer((req, res) => {
-  fileServer.serve(req, res)
-}).listen(8080)
+const rootServer = https.createServer(
+  {
+    cert: fs.readFileSync("server.cert"),
+    key: fs.readFileSync("server.key")
+  },
+  (req, res) => {
+    fileServer.serve(req, res)
+  }).listen(8082)
 
 // WebSocket
 
-process.env.LOGGING="true"
+process.env.LOGGING = "true"
 
 import WebSocket, { Server } from 'ws'
 import { v4 as uuid } from 'uuid'

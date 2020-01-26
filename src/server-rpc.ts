@@ -1,7 +1,7 @@
 export async function join(meetingServer: string):
   Promise<{
     socket: WebSocket,
-    url: string
+    joinUrl: string
   }> {
 
   const socket = new WebSocket(meetingServer)
@@ -14,7 +14,7 @@ export async function join(meetingServer: string):
 
   return {
     socket,
-    url: `${meetingServer}${token}`
+    joinUrl: `${meetingServer}${token}`
   }
 
 }

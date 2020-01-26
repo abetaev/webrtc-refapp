@@ -13,6 +13,22 @@
 
   <script src="client.js"></script>
 
+  <div id="main">
+
+    <div id="join">
+      <button id="generateJoinUrl" onclick="generateJoinUrl()">generate join url</button>
+      <input id="joinUrl" type="text" readonly hidden>
+    </div>
+
+    <div id="accept">
+      <input id="acceptUrl" type="text">
+      <button id="acceptJoinRequest" onclick="acceptJoinRequest()">accept join request</button>
+    </div>
+
+    <div id="videos"></div>
+
+  </div>
+
 </body>
 
 </html>

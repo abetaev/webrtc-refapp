@@ -19,21 +19,22 @@ type Call = {
 export async function join(
   meetingServer: string,
   configuration?: RTCConfiguration
-): Promise<Call & { tokenUrl: string }> {
-  const { socket, url: invitation } = await server.join(meetingServer)
+): Promise<Call & { joinUrl: string }> {
+  const { socket, joinUrl } = await server.join(meetingServer)
   const setupPeer = new RTCPeerConnection(configuration)
+  console.log(joinUrl)
   return {
-    tokenUrl: invitation,
+    joinUrl,
     setupPeer,
     readyPeerPromise: handleJoinerDialog(setupPeer, socket)
   }
 }
 
 export async function accept(
-  tokenUrl: string,
+  joinUrl: string,
   configuration?: RTCConfiguration
 ): Promise<Call> {
-  const socket = await server.accept(tokenUrl)
+  const socket = await server.accept(joinUrl)
   const setupPeer = new RTCPeerConnection(configuration);
   return {
     setupPeer,
