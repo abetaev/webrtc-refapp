@@ -6,9 +6,8 @@ export interface Connection {
 }
 
 type Call = {
-  data: (name: string) => RTCDataChannel,
-  stream: (stream: MediaStream) => void,
-  peer: Promise<RTCPeerConnection> // resolves when it's ready
+  setupPeer: RTCPeerConnection
+  readyPeerPromise: Promise<RTCPeerConnection> // resolves when it's ready
 }
 
 /*
@@ -17,20 +16,16 @@ type Call = {
  * syntax restrictions of any kind, but because it is absurd to do so
  * :)
 */
-export async function invite(
+export async function join(
   meetingServer: string,
   configuration?: RTCConfiguration
-): Promise<Call & { url: string }> {
+): Promise<Call & { tokenUrl: string }> {
   const { socket, url: invitation } = await server.join(meetingServer)
-  const peer = new RTCPeerConnection(configuration)
-  peer.ondatachannel = ({channel}) => {
-    channel.onmessage = ({data}) => console.log(data)
-  }
+  const setupPeer = new RTCPeerConnection(configuration)
   return {
-    url: invitation,
-    stream: stream => stream.getTracks().forEach(track => peer.addTrack(track, stream)),
-    data: name => peer.createDataChannel(name),
-    peer: handleCallerDialog(peer, socket)
+    tokenUrl: invitation,
+    setupPeer,
+    readyPeerPromise: handleJoinerDialog(setupPeer, socket)
   }
 }
 
@@ -39,19 +34,14 @@ export async function accept(
   configuration?: RTCConfiguration
 ): Promise<Call> {
   const socket = await server.accept(tokenUrl)
-  const peer = new RTCPeerConnection(configuration);
-  peer.ondatachannel = ({channel}) => {
-    channel.onmessage = ({data}) => console.log(data)
-  }
+  const setupPeer = new RTCPeerConnection(configuration);
   return {
-    data: name => peer.createDataChannel(name),
-    stream: stream => stream.getTracks()
-      .forEach(track => peer.addTrack(track, stream)),
-    peer: handleReceiverDialog(peer, socket)
+    setupPeer,
+    readyPeerPromise: handleAcceptorDialog(setupPeer, socket)
   }
 }
 
-async function handleCallerDialog(peer: RTCPeerConnection, socket: WebSocket):
+async function handleJoinerDialog(peer: RTCPeerConnection, socket: WebSocket):
   Promise<RTCPeerConnection> {
   await new Promise(resolve => {
     socket.onmessage = async ({ data: signallingMessage }: MessageEvent) => {
@@ -87,16 +77,16 @@ async function handleCallerDialog(peer: RTCPeerConnection, socket: WebSocket):
   return peer;
 }
 
-async function handleReceiverDialog(
+async function handleAcceptorDialog(
   peer: RTCPeerConnection,
   socket: WebSocket,
 ): Promise<RTCPeerConnection> {
   const offer = await peer.createOffer();
   await peer.setLocalDescription(offer)
   peer.onicecandidate = (event: RTCPeerConnectionIceEvent) => {
-    console.log('sending ice candidate to peer')
     const { candidate } = event
     if (candidate) {
+      console.log('sending ice candidate to peer')
       sendMessage(socket, {
         type: 'candidate',
         candidate
