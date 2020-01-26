@@ -9,57 +9,64 @@ export const rtcConfiguration: RTCConfiguration = {
     urls: [
       'stun:127.0.0.1:3478', // coturn@localhost
       'stun:127.0.0.1:3479', // coturn@localhost
-      // 'stun:stun.l.google.com:19302'
+      'stun:stun.l.google.com:19302'
     ]
   }]
 };
 
 const meetingServer = 'ws://localhost:8080/'
 
-export const invitationParam = new URL(document.URL).searchParams.get("invitation") || ""
-
-let link: HTMLAnchorElement
+export const tokenUrl = new URL(document.URL).searchParams.get("tokenUrl") || ""
 
 async function main() {
 
-  let connection: client.Connection
+  if (tokenUrl) {
 
-  if (invitationParam) {
+    console.log(`${tokenUrl}`)
 
-    console.log(`accept ${invitationParam}`)
+    const { peer, data } = await client.accept(
+      tokenUrl,
+      rtcConfiguration
+    );
 
-    connection = await client.accept({
-      address: `${meetingServer}${invitationParam}`,
-      invitation: invitationParam,
-      configuration: rtcConfiguration
-    })
+    const ctrl = data('ctrl');
+    ctrl.onopen = () => ctrl.send('hello');
+
+    (await peer).ondatachannel = ({ channel }) => {
+      channel.onmessage = ({ data }) => console.log(data)
+    }
 
   } else {
 
     console.log(`invite`)
 
-    const {
-      meeting: invitation,
-      connection: connection2
-    } = await client.invite(meetingServer, rtcConfiguration)
+    const { url, peer, data } = await client.invite(
+      meetingServer,
+      rtcConfiguration
+    )
 
-    link = document.createElement('a')
-    link.href = `./?invitation=${invitation.invitation}`
+    const ctrl = data('ctrl')
+    ctrl.onopen = () => {
+      console.log(1)
+      ctrl.send('hello')
+    }
+
+    const link = document.createElement('a')
+    link.href = `./?tokenUrl=${url}`
     link.innerText = 'link'
     link.target = '_blank'
     document.body.appendChild(link);
 
-    connection = await connection2
+    (await peer).ondatachannel = ({ channel }: RTCDataChannelEvent) => {
+      console.log('data channel established')
+      channel.onmessage = message => {
+        console.log(message)
+      }
+    }
 
     document.body.removeChild(link)
 
   }
-
-  connection.ctrl.onmessage = ({data}) => {
-    console.log(`message: ${JSON.stringify(data)}`)
-  }
-
-  connection.ctrl.send('hello')
 
 }
 
