@@ -1,4 +1,6 @@
 import * as client from './client-lib'
+import uuid = require('uuid');
+import { accept } from './server-rpc';
 
 require('webrtc-adapter');
 
@@ -18,87 +20,6 @@ const meetingServer = 'wss://192.168.1.13:8082/'
 
 export const tokenUrl = new URL(document.URL).searchParams.get("tokenUrl") || ""
 
-async function main() {
-
-  const localStream = (await navigator.mediaDevices.getUserMedia({ audio: true, video: true }))
-  if (tokenUrl) {
-
-    console.log(`accept ${tokenUrl}`)
-
-    const { readyPeerPromise, setupPeer } = await client.accept(
-      tokenUrl,
-      rtcConfiguration
-    );
-
-    const ctrl = setupPeer.createDataChannel('ctrl');
-    ctrl.onopen = () => ctrl.send('hello');
-    ctrl.onmessage = ({ data }) => console.log(`incomming message: ${data}`);
-
-    setupPeer.ontrack = ({ streams: [stream] }) => {
-      if (!document.getElementById(stream.id)) {
-        console.log(stream.id)
-        console.log('receiving track!!!')
-        const video = document.createElement("video");
-        video.id = stream.id
-        video.srcObject = stream
-        video.autoplay = true
-        document.body.appendChild(video);
-      }
-    }
-    stream(setupPeer, localStream)
-    await readyPeerPromise
-
-  } else {
-
-    console.log(`join`)
-
-    const { joinUrl: tokenUrl, readyPeerPromise, setupPeer } = await client.join(
-      meetingServer,
-      rtcConfiguration
-    )
-
-    const link = document.createElement('a')
-    link.href = `./?tokenUrl=${tokenUrl}`
-    link.innerText = 'link'
-    link.target = '_blank'
-    document.body.appendChild(link);
-
-    setupPeer.ondatachannel = ({ channel }: RTCDataChannelEvent) => {
-      channel.onmessage = ({ data }) => {
-        console.log(`incomming message: ${data}`)
-        if (data === "hello") {
-          channel.send("hi!")
-        }
-      }
-    }
-
-    stream(setupPeer, localStream)
-
-    setupPeer.ontrack = ({ streams: [stream] }) => {
-      if (!document.getElementById(stream.id)) {
-        console.log(stream.id)
-        console.log('receiving track!!!')
-        const video = document.createElement("video");
-        video.id = stream.id
-        video.srcObject = stream
-        video.autoplay = true
-        document.body.appendChild(video);
-      }
-    }
-
-    await readyPeerPromise
-
-    document.body.removeChild(link)
-
-  }
-
-}
-
-const stream = (peer: RTCPeerConnection, stream: MediaStream) =>
-  stream.getTracks().forEach(track => peer.addTrack(track, stream));
-
-// main()
-
 const getLocalStream = async () => {
   const existingElement = document.getElementById('localStream') as HTMLVideoElement
 
@@ -114,16 +35,91 @@ const getLocalStream = async () => {
 }
 
 function addVideoStream(id: string, stream: MediaStream) {
-  
+
   const videoElement = document.createElement("video")
   videoElement.id = id
   videoElement.autoplay = true
   videoElement.srcObject = stream
   videoElement.load()
-  
+
   const videosDiv = document.getElementById("videos") as HTMLDivElement
   videosDiv.appendChild(videoElement)
 
+}
+
+const channels: { [id: string]: RTCDataChannel } = {}
+
+async function handleControlMessage(data: string, channel: RTCDataChannel) {
+  const message: ControlMessage = JSON.parse(data)
+
+  switch (message.type) {
+
+    case "network":
+      network.connections.push(message.network.id)
+      channels[message.network.id] = channel
+      const newConnections = message.network.connections.filter((id: string) => !network.connections.includes(id))
+      console.log(`network updated: ${JSON.stringify(network)}`)
+      console.log(`new connections: ${JSON.stringify(newConnections)}`)
+      newConnections.forEach(
+        id => {
+          if (!channels[id]) {
+            client.join(meetingServer)
+              .then(async ({ joinUrl, initPeer }) => {
+                configurePeer(initPeer, await getLocalStream());
+                channel.send(JSON.stringify({
+                  type: "join",
+                  to: id,
+                  body: joinUrl
+                }))
+              })
+          }
+        }
+      )
+      break;
+
+    case "join":
+      if (message.to === network.id) {
+        console.log('accepting')
+        const { initPeer } = await client.accept(message.body)
+        configurePeer(initPeer, await getLocalStream())
+      } else if (channels[message.to]) {
+        console.log('forwarding')
+        // if it's not to us and we know to whom, just forward
+        channels[message.to].send(data)
+      } else {
+        console.log('rejecting')
+      }
+      break;
+
+  }
+
+}
+
+type ControlMessage = {
+  type: "network",
+  network: Network
+} | {
+  type: "join",
+  to: string,
+  body: any
+}
+
+function initControlChannel(peer: RTCPeerConnection) {
+  const channel = peer.createDataChannel("ctrl")
+  channel.onopen = () => channel.send(JSON.stringify({
+    type: "network",
+    network
+  }))
+  channel.onmessage = ({ data }) => handleControlMessage(data, channel)
+}
+
+function joinControlChannel(peer: RTCPeerConnection) {
+  peer.ondatachannel = ({ channel }) => {
+    if (channel.label === "ctrl") {
+      channel.onmessage = ({ data }) => handleControlMessage(data, channel)
+      channel.send(JSON.stringify({ type: "network", network }))
+    }
+  }
 }
 
 function configurePeer(peer: RTCPeerConnection, stream: MediaStream) {
@@ -138,6 +134,16 @@ function configurePeer(peer: RTCPeerConnection, stream: MediaStream) {
 
 }
 
+interface Network {
+  id: string,
+  connections: string[]
+}
+
+const network: Network = {
+  id: uuid(),
+  connections: []
+}
+
 Object.assign(window, {
 
   generateJoinUrl: async () => {
@@ -145,11 +151,8 @@ Object.assign(window, {
     const localStream = await getLocalStream()
 
     // generate
-    const { joinUrl, setupPeer, readyPeerPromise } = await client.join(meetingServer, rtcConfiguration)
+    const { joinUrl, initPeer: setupPeer, readyPeerPromise } = await client.join(meetingServer, rtcConfiguration)
     console.log({ joinUrl, setupPeer, readyPeerPromise })
-
-    // configure
-    configurePeer(setupPeer, localStream)
 
     // show
     const joinUrlInput = document.getElementById("joinUrl") as HTMLInputElement
@@ -157,6 +160,10 @@ Object.assign(window, {
     joinUrlInput.hidden = false
     const generateJoinUrlButton = document.getElementById("generateJoinUrl") as HTMLButtonElement
     generateJoinUrlButton.hidden = true
+
+    // configure
+    configurePeer(setupPeer, localStream)
+    joinControlChannel(setupPeer)
 
     await readyPeerPromise
 
@@ -172,9 +179,10 @@ Object.assign(window, {
     const acceptUrlInput = document.getElementById("acceptUrl") as HTMLInputElement
     const acceptUrl = acceptUrlInput.value
 
-    const { setupPeer, readyPeerPromise } = await client.accept(acceptUrl)
+    const { initPeer: setupPeer, readyPeerPromise } = await client.accept(acceptUrl)
 
     configurePeer(setupPeer, localStream)
+    initControlChannel(setupPeer)
 
     await readyPeerPromise
 

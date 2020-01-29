@@ -12,6 +12,7 @@ const rootServer = https.createServer(
     key: fs.readFileSync("server.key")
   },
   (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache')
     fileServer.serve(req, res)
   }).listen(8082)
 
