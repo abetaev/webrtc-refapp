@@ -12,7 +12,7 @@ const handler = (req: IncomingMessage, res: ServerResponse) => {
   fileServer.serve(req, res)
 }
 
-const ssl = process.env['https']
+const ssl = process.env['SSL']
 
 const rootServer = (
   ssl ?

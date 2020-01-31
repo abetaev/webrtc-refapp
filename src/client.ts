@@ -21,7 +21,6 @@ let meetingServer = `wss://${url.host}/`
 const meetingServerInput = document.getElementById("meetingServer") as HTMLInputElement
 meetingServerInput.value = meetingServer
 meetingServerInput.onchange = ({ target }) => meetingServer = target["value"]
-export const tokenUrl = new URL(document.URL).searchParams.get("tokenUrl") || ""
 
 const getLocalStream = async () => {
   const existingElement = document.getElementById('localStream') as HTMLVideoElement
@@ -39,22 +38,34 @@ const getLocalStream = async () => {
 
 function addVideoStream(id: string, stream: MediaStream) {
 
+  const divElement = document.createElement("div")
   const videoElement = document.createElement("video")
   videoElement.id = id
   videoElement.autoplay = true
   videoElement.srcObject = stream
   videoElement.muted = true
   videoElement.load()
+  divElement.appendChild(videoElement)
 
   if (id === 'localStream') {
-    videoElement.style.position = 'absolute'
-    videoElement.style.left = '0px'
-    videoElement.style.bottom = '0px'
-    videoElement.style.width = '100px'
+    divElement.style.position = 'absolute'
+    divElement.style.left = '0px'
+    divElement.style.bottom = '0px'
+    if (videoElement.videoWidth < videoElement.videoHeight) {
+      videoElement.style.width = '100px'
+    } else {
+      videoElement.style.height = '100px'
+    }
+  } else {
+    if (videoElement.videoWidth < videoElement.videoHeight) {
+      videoElement.style.width = '100%'
+    } else {
+      videoElement.style.height = '100%'
+    }
   }
 
   const videosDiv = document.getElementById("videos") as HTMLDivElement
-  videosDiv.appendChild(videoElement)
+  videosDiv.appendChild(divElement)
 
 }
 

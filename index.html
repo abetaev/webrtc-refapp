@@ -27,35 +27,34 @@
       grid-column: 1;
       grid-row: 1;
 
-      display: grid;
       column-gap: 25px;
-      grid-template-columns: repeat(auto-fix, minmax(200, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(200, 1fr));
 
       height: min-content;
 
       align-items: stretch;
     }
 
-    #server,
-    #join,
-    #accept {
-      padding: 1px;
-      margin: 0px;
+    #videos {
+      grid-column: 1;
+      grid-row-start: 2;
+      grid-row-end: 2;
 
+      grid-template-columns: repeat(auto-fit, minmax(100px, 2fr));
+      grid-template-rows: repeat(auto-fit, minmax(100px, 2fr));
+
+      align-items: center;
+      justify-items: center;
+    }
+
+    label {
+      text-align: right;
+      padding: 5px;
+    }
+
+    .grid {
       display: grid;
     }
-
-    /* #server {
-      grid-column-start: 1;
-    }
-
-    #join {
-      grid-column-start: 2;
-    }
-
-    #accept {
-      grid-column-start: 3;
-    } */
 
     .left {
       grid-column-start: 1;
@@ -67,44 +66,39 @@
       grid-column-end: 2;
     }
 
-    #videos {
-      grid-column: 1;
+    .top {
+      grid-row-start: 1;
+      grid-row-end: 2;
+    }
+
+    .bottom {
       grid-row-start: 2;
       grid-row-end: 2;
-
-      display: grid;
-
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      grid-template-rows: repeat(auto-fit, minmax(150px, 1fr));
     }
 
-    label {
-      text-align: right;
-      padding: 5px;
-    }
   </style>
 
 </head>
 
 <body>
 
-  <div id="main">
+  <div id="main" class="grid">
 
-    <div id="controls">
+    <div id="controls" class="grid">
 
-      <div id="server">
+      <div id="server" class="grid">
         <label for="meetingServer" class="left">meeting server</label>
         <input id="meetingServer" type="text" class="right">
       </div>
 
-      <div id="join">
+      <div id="join" class="grid">
         <button id="generateJoinUrl" onclick="generateJoinUrl()">
           join
         </button>
         <input id="joinUrl" type="text" readonly hidden>
       </div>
 
-      <div id="accept">
+      <div id="accept" class="grid">
         <input id="acceptUrl" type="text" class="left">
         <button id="acceptJoinRequest" onclick="acceptJoinRequest()" class="right">
           accept
@@ -113,7 +107,7 @@
 
     </div>
 
-    <div id="videos"></div>
+    <div id="videos" class="grid"></div>
 
   </div>
 
