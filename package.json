@@ -6,26 +6,29 @@
     "clean": "rm -r dist .cache node_modules; npm ci",
     "build-client": "parcel build -t browser src/client.ts --out-file dist/client.js; cp index.html dist",
     "build-server": "parcel build -t node src/server.ts --out-file dist/server.js",
-    "start-dev": "tsc-watch --build tsconfig.json --onSuccess \"node dist/server.js\" --onCompilationComplete \"npm run build-client\"",
-    "start": "npm run build-client; npm run build-server; node dist/server.js",
-    "test": "jest"
+    "build": "npm run build-client; npm run build-server",
+    "rebuild": "npm run clean; npm run build",
+    "prepack": "npm run rebuild",
+    "start": "node dist/server.js",
+    "deploy": "npm run rebuild; npm run deploy",
+    "dev": "tsc-watch --build tsconfig.json --onSuccess 'node dist/server.js' --onCompilationComplete 'npm run build-client'",
+    "test": "exit 0"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "webrtc-adapter": "^7.4.0"
+    "uuid": "^3.4.0",
+    "ws": "^7.2.1",
+    "node-static": "^0.7.11"
   },
   "devDependencies": {
     "@types/node-static": "^0.7.3",
-    "@types/uuid": "^3.4.6",
-    "@types/ws": "^7.2.0",
-    "http": "0.0.0",
+    "@types/uuid": "^3.4.7",
+    "@types/ws": "^7.2.1",
     "jest": "^24.9.0",
-    "node-static": "^0.7.11",
     "parcel": "^1.12.4",
     "tsc-watch": "^4.1.0",
     "typescript": "^3.7.5",
-    "uuid": "^3.4.0",
-    "ws": "^7.2.1"
+    "webrtc-adapter": "^7.5.0"
   }
 }

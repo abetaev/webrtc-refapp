@@ -1,6 +1,5 @@
 import * as client from './client-lib'
 import uuid = require('uuid');
-import { accept } from './server-rpc';
 
 require('webrtc-adapter');
 
@@ -9,15 +8,19 @@ require('webrtc-adapter');
 export const rtcConfiguration: RTCConfiguration = {
   iceServers: [{
     urls: [
-      'stun:192.168.1.13:3478', // coturn@localhost
+      // 'stun:192.168.1.13:3478', // coturn@localhost
       // 'stun:127.0.0.1:3479', // coturn@localhost
       'stun:stun.l.google.com:19302'
     ]
   }]
 };
 
-const meetingServer = 'wss://192.168.1.13:8082/'
+const url = new URL(document.URL)
 
+let meetingServer = `wss://${url.host}/`
+const meetingServerInput = document.getElementById("meetingServer") as HTMLInputElement
+meetingServerInput.value = meetingServer
+meetingServerInput.onchange = ({ target }) => meetingServer = target["value"]
 export const tokenUrl = new URL(document.URL).searchParams.get("tokenUrl") || ""
 
 const getLocalStream = async () => {
@@ -40,7 +43,15 @@ function addVideoStream(id: string, stream: MediaStream) {
   videoElement.id = id
   videoElement.autoplay = true
   videoElement.srcObject = stream
+  videoElement.muted = true
   videoElement.load()
+
+  if (id === 'localStream') {
+    videoElement.style.position = 'absolute'
+    videoElement.style.left = '0px'
+    videoElement.style.bottom = '0px'
+    videoElement.style.width = '100px'
+  }
 
   const videosDiv = document.getElementById("videos") as HTMLDivElement
   videosDiv.appendChild(videoElement)
@@ -49,24 +60,25 @@ function addVideoStream(id: string, stream: MediaStream) {
 
 const channels: { [id: string]: RTCDataChannel } = {}
 
-async function handleControlMessage(data: string, channel: RTCDataChannel) {
+async function handleControlMessage(data: string, replyChannel: RTCDataChannel) {
   const message: ControlMessage = JSON.parse(data)
 
   switch (message.type) {
 
     case "network":
       network.connections.push(message.network.id)
-      channels[message.network.id] = channel
+      channels[message.network.id] = replyChannel
       const newConnections = message.network.connections.filter((id: string) => !network.connections.includes(id))
       console.log(`network updated: ${JSON.stringify(network)}`)
       console.log(`new connections: ${JSON.stringify(newConnections)}`)
       newConnections.forEach(
         id => {
           if (!channels[id]) {
+            console.log(`joining to ${id}`)
             client.join(meetingServer)
               .then(async ({ joinUrl, initPeer }) => {
                 configurePeer(initPeer, await getLocalStream());
-                channel.send(JSON.stringify({
+                replyChannel.send(JSON.stringify({
                   type: "join",
                   to: id,
                   body: joinUrl
@@ -117,7 +129,7 @@ function joinControlChannel(peer: RTCPeerConnection) {
   peer.ondatachannel = ({ channel }) => {
     if (channel.label === "ctrl") {
       channel.onmessage = ({ data }) => handleControlMessage(data, channel)
-      channel.send(JSON.stringify({ type: "network", network }))
+      channel.onopen = () => channel.send(JSON.stringify({ type: "network", network }))
     }
   }
 }

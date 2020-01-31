@@ -1,20 +1,30 @@
 // HTTPS
 
 import https from 'https'
+import http, { IncomingMessage, ServerResponse } from 'http'
 import { Server as FileServer } from 'node-static'
 import fs from 'fs'
 
 const fileServer = new FileServer("./dist")
 
-const rootServer = https.createServer(
-  {
-    cert: fs.readFileSync("server.cert"),
-    key: fs.readFileSync("server.key")
-  },
-  (req, res) => {
-    res.setHeader('Cache-Control', 'no-cache')
-    fileServer.serve(req, res)
-  }).listen(8082)
+const handler = (req: IncomingMessage, res: ServerResponse) => {
+  res.setHeader('Cache-Control', 'no-cache')
+  fileServer.serve(req, res)
+}
+
+const ssl = process.env['https']
+
+const rootServer = (
+  ssl ?
+    https.createServer(
+      {
+        cert: fs.readFileSync("server.cert"),
+        key: fs.readFileSync("server.key")
+      },
+      handler) :
+    http.createServer(handler))
+
+rootServer.listen(process.env.PORT || (ssl ? 8082 : 8080))
 
 // WebSocket
 
