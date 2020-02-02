@@ -3,77 +3,95 @@
 
 <head>
 
-  <title>webrtc-refapp</title>
+  <title>queetings</title>
 
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 
-  <style type="text/css">
-    #main {
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1">
+
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cash/6.0.1/cash.min.js"></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard-polyfill/2.8.6/clipboard-polyfill.js"></script>
+
+  <script src="client.js"></script>
+
+  <style>
+  
+    #sendToTelegram {
+      background-image: url("https://telegram.org/img/t_logo.png");
+      background-size: 60%;
+      background-position: center;
+      background-repeat: no-repeat;
+    }
+    
+    #layout {
       display: grid;
-
-      grid-template-rows: min-content auto;
-
       position: absolute;
       width: 100%;
       height: 100%;
-      top: 0px;
-      left: 0px;
-
-      overflow: hidden;
-    }
-
-    #controls {
-      grid-column: 1;
-      grid-row: 1;
-
-      column-gap: 25px;
-      grid-template-columns: repeat(auto-fit, minmax(200, 1fr));
-
-      height: min-content;
-
-      align-items: stretch;
-    }
-
-    #videos {
-      grid-column: 1;
-      grid-row-start: 2;
-      grid-row-end: 2;
-
-      grid-template-columns: repeat(auto-fit, minmax(100px, 2fr));
-      grid-template-rows: repeat(auto-fit, minmax(100px, 2fr));
-
-      align-items: center;
+      left: 0;
+      top: 0;
+      justify-content: center;
       justify-items: center;
     }
 
-    label {
-      text-align: right;
-      padding: 5px;
+    body {
+      overflow: hidden;
     }
 
-    .grid {
-      display: grid;
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      width: max-content;
+      justify-content: center;
     }
 
-    .left {
-      grid-column-start: 1;
-      grid-column-end: 2;
+    main {
+      display: flex;
+      height: 100%;
+      width: 100%;
     }
 
-    .right {
-      grid-column-start: 2;
-      grid-column-end: 2;
+    main.portrait {
+      overflow-x: hidden;
+      overflow-y: scroll;
+      flex-wrap: wrap;
     }
 
-    .top {
-      grid-row-start: 1;
-      grid-row-end: 2;
+    main.landscape {
+      overflow-x: scroll;
+      overflow-y: hidden;
+      flex-wrap: nowrap;
     }
 
-    .bottom {
-      grid-row-start: 2;
-      grid-row-end: 2;
+    aside {
+      display: block;
+      position: absolute;
+      left: 0;
+      bottom: 0;
+    }
+
+    input {
+      padding: 0px;
+      margin: 4px;
+      height: 3em - 8px;
+      width: max-content;
+      min-width: min-content;
+      border: none;
+      border-bottom: 1px solid teal;
+    }
+
+    button {
+      width: 3em;
+      min-width: 3em;
+      height: 3em;
+      background: white;
+      border: 2px teal solid;
+      margin: 2px;
     }
 
   </style>
@@ -82,36 +100,155 @@
 
 <body>
 
-  <div id="main" class="grid">
+  <div id="layout">
 
-    <div id="controls" class="grid">
+    <nav>
+      <button id="sendToTelegram"
+              onclick="sendToTelegram()">&nbsp;</button>
+      <button id="sendViaEmail"
+              onclick="sendViaEmail()">📧</button>
+      <button id="copyToClipboard"
+              onclick="copyToClipboard()">🔗</button>
+    </nav>
 
-      <div id="server" class="grid">
-        <label for="meetingServer" class="left">meeting server</label>
-        <input id="meetingServer" type="text" class="right">
-      </div>
-
-      <div id="join" class="grid">
-        <button id="generateJoinUrl" onclick="generateJoinUrl()">
-          join
-        </button>
-        <input id="joinUrl" type="text" readonly hidden>
-      </div>
-
-      <div id="accept" class="grid">
-        <input id="acceptUrl" type="text" class="left">
-        <button id="acceptJoinRequest" onclick="acceptJoinRequest()" class="right">
-          accept
-        </button>
-      </div>
-
-    </div>
-
-    <div id="videos" class="grid"></div>
+    <main></main>
 
   </div>
 
-  <script src="client.js"></script>
+  <aside></aside>
+
+  <script>
+
+  const n = 3;
+
+  const orientations = { "landscape" : "portrait" , "portrait" : "landscape" }
+  const dicts = { 
+    "portrait": {
+      "windowSizeName": "innerWidth",
+      "sizeName": "width"
+    },
+    "landscape": {
+      "windowSizeName": "innerHeight",
+      "sizeName": "height"
+    }
+  }
+
+  function resize() {
+    const currentOrientation =
+            window.innerHeight > window.innerWidth ?
+              "portrait" :
+              "landscape";
+
+    const oppositeOrientation = orientations[currentOrientation];
+    const { sizeName: sizeNameCurrent,
+            windowSizeName: windowSizeNameCurrent }
+             = dicts[currentOrientation]
+    const { sizeName: sizeNameOpposite,
+            windowSizeName: windowSizeNameOpposite }
+             = dicts[oppositeOrientation]
+    const windowCurrentSize = window[windowSizeNameCurrent]
+    const windowOppositeSize = window[windowSizeNameOpposite]
+
+    $("main > video").css(sizeNameCurrent, windowCurrentSize);
+    $("main > video").css(sizeNameOpposite, '');
+    $("main").removeClass(oppositeOrientation);
+    $("main").addClass(currentOrientation);
+
+    $("aside > video").css(sizeNameCurrent, `${windowCurrentSize * .20}px`);
+    $("aside > video").css(sizeNameOpposite, '');
+
+  }
+
+  window.onresize = resize;
+  
+  </script>
+
+  <script>
+
+  function handleInputStream(stream) {
+    console.log('handling input stream')
+    const { id } = stream;
+    if (document.getElementById(id)) {
+      console.log('stream is already playin')
+      return;
+    }
+    const video = Object.assign(document.createElement("video"), {
+      id,
+      autoplay: true,
+      srcObject: stream
+    })
+    video.load()
+    $("main").append(video)
+    resize()
+  }
+
+  async function copyToClipboard() {
+    const localStream = document.querySelector("aside > video").srcObject
+    join(
+      localStream,
+      (url) => {
+        const shareUrl = `${document.URL}?join=${encodeURI(url)}`
+        const text = encodeURIComponent('join me')
+        navigator.clipboard.writeText(url)
+      },
+      handleInputStream
+    )
+  }
+
+  async function sendToTelegram() {
+    const localStream = document.querySelector("aside > video").srcObject
+    join(
+      localStream,
+      (url) => {
+        const shareUrl = `${document.URL}?join=${encodeURI(url)}`
+        const text = encodeURIComponent('join me')
+        window.open(`https://telegram.me/share/url?url=${encodeURI(shareUrl)}`)
+      },
+      handleInputStream
+    )
+  }
+
+  async function sendViaEmail() {
+    const localStream = document.querySelector("aside > video").srcObject
+    join(
+      localStream,
+      (url) => {
+        const shareUrl = `${document.URL}?join=${encodeURI(url)}`
+        // const text = encodeURIComponent('join me')
+        window.open(`mailto:?body=${encodeURI(shareUrl)}`)
+      },
+      handleInputStream
+    )
+  }
+
+  (async () => {
+
+    const localStream = await navigator.mediaDevices.getUserMedia(
+                          { video:true, audio: true }
+                        )
+
+    const video = Object.assign(document.createElement("video"), {
+      muted:      true,
+      autoplay:   true,
+      srcObject:  localStream,
+    });
+    video.load();
+    $("aside").append(video);
+
+    const joinUrl = new URL(document.URL).searchParams.get("join")
+    if (joinUrl) {
+      accept(
+        localStream,
+        joinUrl,
+        handleInputStream
+      )
+    }
+
+    resize()
+
+  })()
+
+  </script>
 
 </body>
 

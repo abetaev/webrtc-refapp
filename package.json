@@ -1,6 +1,6 @@
 {
-  "name": "comm-server",
-  "version": "0.0.0",
+  "name": "queetings",
+  "version": "0.1.0",
   "description": "",
   "scripts": {
     "clean": "rm -r dist .cache node_modules; npm ci",
@@ -14,12 +14,13 @@
     "dev": "tsc-watch --build tsconfig.json --onSuccess 'node dist/server.js' --onCompilationComplete 'npm run build-client'",
     "test": "exit 0"
   },
-  "author": "",
+  "author": "abetaev",
   "license": "ISC",
   "dependencies": {
+    "node-static": "^0.7.11",
+    "stun": "^2.1.0",
     "uuid": "^3.4.0",
-    "ws": "^7.2.1",
-    "node-static": "^0.7.11"
+    "ws": "^7.2.1"
   },
   "devDependencies": {
     "@types/node-static": "^0.7.3",

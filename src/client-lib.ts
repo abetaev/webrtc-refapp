@@ -1,4 +1,5 @@
 import * as server from './server-rpc'
+import { DialogHandler } from './server-rpc'
 
 export interface Connection {
   peer: RTCPeerConnection
@@ -6,40 +7,35 @@ export interface Connection {
 }
 
 type Call = {
-  initPeer: RTCPeerConnection
-  readyPeerPromise: Promise<RTCPeerConnection> // resolves when it's ready
+  peer: RTCPeerConnection
+  init: () => Promise<void> // resolves when it's ready
+}
+
+function createPeer(dialogHandler: DialogHandler, configuration?: RTCConfiguration): RTCPeerConnection {
+  const peer = new RTCPeerConnection(configuration)
+  peer.onicecandidate = (event: RTCPeerConnectionIceEvent) => {
+    const { candidate } = event
+    if (candidate) {
+      console.log('sending ice candidate to peer')
+      dialogHandler.sendMessage({
+        type: 'candidate',
+        candidate
+      });
+    }
+  };
+  return peer
 }
 
 export async function join(
   meetingServer: string,
   configuration?: RTCConfiguration
 ): Promise<Call & { joinUrl: string }> {
-  const { socket, joinUrl } = await server.join(meetingServer)
-  const initPeer = new RTCPeerConnection(configuration)
-  console.log(joinUrl)
+  const { dialogHandler, joinUrl } = await server.join(meetingServer)
+  const peer = createPeer(dialogHandler, configuration)
   return {
     joinUrl,
-    initPeer,
-    readyPeerPromise: handleJoinerDialog(initPeer, {
-      onMessage: (receiver) => socket.onmessage = ({ data }) => receiver(JSON.parse(data)),
-      sendMessage: (message: any) => socket.send(JSON.stringify(message))
-    })
-  }
-}
-
-export async function connect(
-  channel: RTCDataChannel,
-  onMessage: (recever: (event: MessageEvent) => void) => void,
-  configuration?: RTCConfiguration
-): Promise<Call> {
-
-  const initPeer = new RTCPeerConnection(configuration)
-  return {
-    initPeer,
-    readyPeerPromise: handleJoinerDialog(initPeer, {
-      onMessage,
-      sendMessage: data => channel.send(JSON.stringify({ type: "signal", data }))
-    })
+    peer,
+    init: () => handlePeerDialog(peer, dialogHandler)
   }
 }
 
@@ -47,106 +43,67 @@ export async function accept(
   joinUrl: string,
   configuration?: RTCConfiguration
 ): Promise<Call> {
-  const socket = await server.accept(joinUrl)
-  const initPeer = new RTCPeerConnection(configuration);
+  const dialogHandler = await server.accept(joinUrl)
+  const peer = createPeer(dialogHandler, configuration)
   return {
-    initPeer,
-    readyPeerPromise: handleAcceptorDialog(initPeer, socket)
+    peer,
+    init: async () => {
+      const offer = await peer.createOffer();
+      await peer.setLocalDescription(offer)
+      dialogHandler.sendMessage(offer)
+      handlePeerDialog(
+        peer,
+        dialogHandler
+      )
+    }
   }
-}
-
-type DialogHandler = {
-  onMessage: (receiver: (event: MessageEvent) => Promise<void>) => void,
-  sendMessage: (message: any) => void
 }
 
 type CandidateEvent = { type: "candidate", candidate: RTCIceCandidate } & MessageEvent
 type OfferEvent = { type: "offer" } & MessageEvent
 type ErrorEvent = { type: "error", code: string } & MessageEvent
+type AnswerEvent = { type: "answer" } & MessageEvent
 
-async function handleJoinerDialog(peer: RTCPeerConnection,
-  { onMessage, sendMessage }: DialogHandler):
-  Promise<RTCPeerConnection> {
-  await new Promise(resolve => {
+async function handlePeerDialog(
+  peer: RTCPeerConnection,
+  { onMessage, sendMessage }: DialogHandler
+) {
+  await new Promise((resolve, reject) => {
     onMessage(
-      async (event: CandidateEvent | OfferEvent | ErrorEvent) => {
+      async (event: CandidateEvent | OfferEvent | AnswerEvent | ErrorEvent) => {
 
-        const { type } = event
+        const { type } = event;
 
         switch (type) {
 
-          case 'candidate':
-            console.log('received ice candidate from peer')
-            const { candidate } = event as CandidateEvent
-            peer.addIceCandidate(new RTCIceCandidate(candidate));
-            break;
-
           case 'offer':
             console.log('offer')
-            await peer.setRemoteDescription(new RTCSessionDescription(event as OfferEvent))
+            await peer.setRemoteDescription(new RTCSessionDescription(event as OfferEvent));
             const answer = await peer.createAnswer();
             await peer.setLocalDescription(answer);
-            sendMessage(answer)
+            sendMessage(answer);
+            resolve();
+            break;
+
+          case 'answer':
+            console.log('answer')
+            await peer.setRemoteDescription(new RTCSessionDescription(event as AnswerEvent));
             resolve()
             break;
 
-          case "error":
-            const { code } = event as ErrorEvent
-            console.log(`error: ${code}`)
+          case 'candidate':
+            console.log('received ice candidate from peer');
+            const { candidate } = event as CandidateEvent;
+            peer.addIceCandidate(new RTCIceCandidate(candidate));
             break;
+
+          case "error":
+            const { code } = event as ErrorEvent;
+            reject(new Error(`unable to join: ${code}`));
+            break;
+
         }
       })
   })
 
-  return peer;
-}
-
-async function handleAcceptorDialog(
-  peer: RTCPeerConnection,
-  socket: WebSocket,
-): Promise<RTCPeerConnection> {
-  const offer = await peer.createOffer();
-  await peer.setLocalDescription(offer)
-  peer.onicecandidate = (event: RTCPeerConnectionIceEvent) => {
-    const { candidate } = event
-    if (candidate) {
-      console.log('sending ice candidate to peer')
-      sendMessage(socket, {
-        type: 'candidate',
-        candidate
-      });
-    }
-  };
-  sendMessage(socket, offer)
-
-  await new Promise(resolve => {
-    socket.onmessage = async ({ data: signallingMessage }: MessageEvent) => {
-
-      const event: MessageEvent & any = JSON.parse(signallingMessage)
-      const { type } = event
-
-      switch (type) {
-
-        case 'answer':
-          console.log('answer')
-          await peer.setRemoteDescription(new RTCSessionDescription(event));
-          resolve()
-          break;
-
-        case "error":
-          const { code } = event
-          console.log(`error: ${code}`)
-          break;
-
-      }
-
-    }
-  })
-
-  return peer;
-
-}
-
-function sendMessage(socket: WebSocket, message: any) {
-  socket.send(JSON.stringify(message))
 }

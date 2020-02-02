@@ -3,6 +3,11 @@ import uuid = require('uuid');
 
 require('webrtc-adapter');
 
+const url = new URL(document.URL)
+
+const stunServerUrl = `stun:${url.hostname}:3478`
+let meetingServer = `${url.host.startsWith("localhost") && !process.env.SSL ? 'ws' : 'wss'}://${url.host}/`
+
 // config
 
 export const rtcConfiguration: RTCConfiguration = {
@@ -10,73 +15,33 @@ export const rtcConfiguration: RTCConfiguration = {
     urls: [
       // 'stun:192.168.1.13:3478', // coturn@localhost
       // 'stun:127.0.0.1:3479', // coturn@localhost
-      'stun:stun.l.google.com:19302'
+      // stunServerUrl,
+      'stun:stun.l.google.com:19302',
+      // 'stun:stun1.l.google.com:19302',
+      // 'stun:stun2.l.google.com:19302',
+      // 'stun:stun3.l.google.com:19302',
+      // 'stun:stun4.l.google.com:19302',
+      // 'stun:stun.voipbuster.com',
+      'stun:stun.voipstunt.com',
+      // 'stun:stun.voxgratia.org',
+      // 'stun:stun.xten.com'
     ]
   }]
 };
 
-const url = new URL(document.URL)
-
-let meetingServer = `wss://${url.host}/`
-const meetingServerInput = document.getElementById("meetingServer") as HTMLInputElement
-meetingServerInput.value = meetingServer
-meetingServerInput.onchange = ({ target }) => meetingServer = target["value"]
-
-const getLocalStream = async () => {
-  const existingElement = document.getElementById('localStream') as HTMLVideoElement
-
-  if (existingElement) {
-    return existingElement.srcObject as MediaStream
-  }
-
-  const localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
-
-  addVideoStream('localStream', localStream)
-
-  return localStream
-}
-
-function addVideoStream(id: string, stream: MediaStream) {
-
-  const divElement = document.createElement("div")
-  const videoElement = document.createElement("video")
-  videoElement.id = id
-  videoElement.autoplay = true
-  videoElement.srcObject = stream
-  videoElement.muted = true
-  videoElement.load()
-  divElement.appendChild(videoElement)
-
-  if (id === 'localStream') {
-    divElement.style.position = 'absolute'
-    divElement.style.left = '0px'
-    divElement.style.bottom = '0px'
-    if (videoElement.videoWidth < videoElement.videoHeight) {
-      videoElement.style.width = '100px'
-    } else {
-      videoElement.style.height = '100px'
-    }
-  } else {
-    if (videoElement.videoWidth < videoElement.videoHeight) {
-      videoElement.style.width = '100%'
-    } else {
-      videoElement.style.height = '100%'
-    }
-  }
-
-  const videosDiv = document.getElementById("videos") as HTMLDivElement
-  videosDiv.appendChild(divElement)
-
-}
 
 const channels: { [id: string]: RTCDataChannel } = {}
 
-async function handleControlMessage(data: string, replyChannel: RTCDataChannel) {
+async function handleControlMessage(data: string, replyChannel: RTCDataChannel, localStream: MediaStream, onstream: (stream: MediaStream) => void) {
   const message: ControlMessage = JSON.parse(data)
 
   switch (message.type) {
 
     case "network":
+      if (message.network.id === network.id) {
+        return;
+      }
+
       network.connections.push(message.network.id)
       channels[message.network.id] = replyChannel
       const newConnections = message.network.connections.filter((id: string) => !network.connections.includes(id))
@@ -85,15 +50,16 @@ async function handleControlMessage(data: string, replyChannel: RTCDataChannel) 
       newConnections.forEach(
         id => {
           if (!channels[id]) {
-            console.log(`joining to ${id}`)
             client.join(meetingServer)
-              .then(async ({ joinUrl, initPeer }) => {
-                configurePeer(initPeer, await getLocalStream());
+              .then(async ({ joinUrl, peer, init }) => {
+                configurePeer(peer, localStream, onstream);
                 replyChannel.send(JSON.stringify({
                   type: "join",
                   to: id,
                   body: joinUrl
                 }))
+                init()
+                console.log(`joining to ${id}: ${joinUrl}`)
               })
           }
         }
@@ -103,8 +69,9 @@ async function handleControlMessage(data: string, replyChannel: RTCDataChannel) 
     case "join":
       if (message.to === network.id) {
         console.log('accepting')
-        const { initPeer } = await client.accept(message.body)
-        configurePeer(initPeer, await getLocalStream())
+        const { peer, init } = await client.accept(message.body)
+        configurePeer(peer, localStream, onstream)
+        init()
       } else if (channels[message.to]) {
         console.log('forwarding')
         // if it's not to us and we know to whom, just forward
@@ -127,34 +94,37 @@ type ControlMessage = {
   body: any
 }
 
-function initControlChannel(peer: RTCPeerConnection) {
+type StreamHandler = (stream: MediaStream) => void
+
+function initControlChannel(peer: RTCPeerConnection, localStream: MediaStream, onstream: StreamHandler) {
   const channel = peer.createDataChannel("ctrl")
   channel.onopen = () => channel.send(JSON.stringify({
     type: "network",
     network
   }))
-  channel.onmessage = ({ data }) => handleControlMessage(data, channel)
+  channel.onmessage = ({ data }) => handleControlMessage(data, channel, localStream, onstream)
 }
 
-function joinControlChannel(peer: RTCPeerConnection) {
+function joinControlChannel(peer: RTCPeerConnection, localStream: MediaStream, onstream: StreamHandler) {
   peer.ondatachannel = ({ channel }) => {
     if (channel.label === "ctrl") {
-      channel.onmessage = ({ data }) => handleControlMessage(data, channel)
+      channel.onmessage = ({ data }) => handleControlMessage(data, channel, localStream, onstream)
       channel.onopen = () => channel.send(JSON.stringify({ type: "network", network }))
     }
   }
 }
 
-function configurePeer(peer: RTCPeerConnection, stream: MediaStream) {
+function configurePeer(
+  peer: RTCPeerConnection,
+  localStream: MediaStream,
+  onstream: (stream: MediaStream) => void) {
 
   peer.ontrack = ({ streams: [stream] }) => {
-    if (!document.getElementById(stream.id)) {
-      addVideoStream(stream.id, stream)
-    }
+    onstream(stream)
   }
 
-  stream.getTracks().forEach(track => peer.addTrack(track, stream))
-
+  localStream.getTracks()
+    .forEach(track => peer.addTrack(track, localStream))
 }
 
 interface Network {
@@ -169,47 +139,38 @@ const network: Network = {
 
 Object.assign(window, {
 
-  generateJoinUrl: async () => {
-
-    const localStream = await getLocalStream()
+  join: async (
+    localStream: MediaStream,
+    onurl: (url: string) => void,
+    onstream: (stream: MediaStream) => void
+  ) => {
 
     // generate
-    const { joinUrl, initPeer: setupPeer, readyPeerPromise } = await client.join(meetingServer, rtcConfiguration)
-    console.log({ joinUrl, setupPeer, readyPeerPromise })
-
-    // show
-    const joinUrlInput = document.getElementById("joinUrl") as HTMLInputElement
-    joinUrlInput.value = joinUrl
-    joinUrlInput.hidden = false
-    const generateJoinUrlButton = document.getElementById("generateJoinUrl") as HTMLButtonElement
-    generateJoinUrlButton.hidden = true
+    const { joinUrl, peer, init } = await client.join(meetingServer, rtcConfiguration)
 
     // configure
-    configurePeer(setupPeer, localStream)
-    joinControlChannel(setupPeer)
+    configurePeer(peer, localStream, onstream)
+    joinControlChannel(peer, localStream, onstream)
 
-    await readyPeerPromise
+    // show
+    onurl(joinUrl)
 
-    generateJoinUrlButton.hidden = false
-    joinUrlInput.hidden = true
+    await init()
 
   },
 
-  acceptJoinRequest: async () => {
+  accept: async (
+    localStream: MediaStream,
+    url: string,
+    onstream: (stream: MediaStream) => void
+  ) => {
 
-    const localStream = await getLocalStream()
+    const { peer, init } = await client.accept(url, rtcConfiguration)
 
-    const acceptUrlInput = document.getElementById("acceptUrl") as HTMLInputElement
-    const acceptUrl = acceptUrlInput.value
+    configurePeer(peer, localStream, onstream)
+    initControlChannel(peer, localStream, onstream)
 
-    const { initPeer: setupPeer, readyPeerPromise } = await client.accept(acceptUrl)
-
-    configurePeer(setupPeer, localStream)
-    initControlChannel(setupPeer)
-
-    await readyPeerPromise
-
-    acceptUrlInput.value = ""
+    await init()
 
   }
 

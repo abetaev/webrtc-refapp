@@ -28,8 +28,6 @@ rootServer.listen(process.env.PORT || (ssl ? 8082 : 8080))
 
 // WebSocket
 
-process.env.LOGGING = "true"
-
 import WebSocket, { Server } from 'ws'
 import { v4 as uuid } from 'uuid'
 
@@ -78,3 +76,16 @@ function log(...args: any) {
     console.log(args)
   }
 }
+
+// STUN
+
+const stunSocket = require('dgram').createSocket({type: 'udp4', reuseAddr: true})
+
+var server = new (require('stun').StunServer)(stunSocket);
+
+// Set log event handler
+server.on('log', function (log) {
+  console.log('STUN: %s : [%s] %s', new Date(), log.level, log.message);
+});
+
+server.listen(3478, '0.0.0.0', (arg) => console.log(arg))

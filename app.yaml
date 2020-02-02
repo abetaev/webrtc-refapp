@@ -10,3 +10,5 @@ resources:
 
 network:
   session_affinity: true
+  forwarded_ports:
+    - 3478:3478/udp
