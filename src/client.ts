@@ -1,4 +1,4 @@
-import * as client from './client-lib'
+import * as client from './rtc-lib'
 import uuid = require('uuid');
 
 require('webrtc-adapter');
@@ -13,18 +13,8 @@ let meetingServer = `${url.host.startsWith("localhost") && !process.env.SSL ? 'w
 export const rtcConfiguration: RTCConfiguration = {
   iceServers: [{
     urls: [
-      // 'stun:192.168.1.13:3478', // coturn@localhost
-      // 'stun:127.0.0.1:3479', // coturn@localhost
-      // stunServerUrl,
-      'stun:stun.l.google.com:19302',
-      // 'stun:stun1.l.google.com:19302',
-      // 'stun:stun2.l.google.com:19302',
-      // 'stun:stun3.l.google.com:19302',
-      // 'stun:stun4.l.google.com:19302',
-      // 'stun:stun.voipbuster.com',
-      'stun:stun.voipstunt.com',
-      // 'stun:stun.voxgratia.org',
-      // 'stun:stun.xten.com'
+      stunServerUrl,
+      'stun:stun.l.google.com:19302'
     ]
   }]
 };

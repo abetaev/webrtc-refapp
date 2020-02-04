@@ -1,5 +1,5 @@
-import * as server from './server-rpc'
-import { DialogHandler } from './server-rpc'
+import * as server from './signalling'
+import { SignallingConnection } from './signalling'
 
 export interface Connection {
   peer: RTCPeerConnection
@@ -11,7 +11,7 @@ type Call = {
   init: () => Promise<void> // resolves when it's ready
 }
 
-function createPeer(dialogHandler: DialogHandler, configuration?: RTCConfiguration): RTCPeerConnection {
+function createPeer(dialogHandler: SignallingConnection, configuration?: RTCConfiguration): RTCPeerConnection {
   const peer = new RTCPeerConnection(configuration)
   peer.onicecandidate = (event: RTCPeerConnectionIceEvent) => {
     const { candidate } = event
@@ -66,7 +66,7 @@ type AnswerEvent = { type: "answer" } & MessageEvent
 
 async function handlePeerDialog(
   peer: RTCPeerConnection,
-  { onMessage, sendMessage }: DialogHandler
+  { onMessage, sendMessage }: SignallingConnection
 ) {
   await new Promise((resolve, reject) => {
     onMessage(
