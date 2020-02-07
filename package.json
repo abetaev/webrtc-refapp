@@ -11,7 +11,7 @@
     "prepack": "npm run rebuild",
     "start": "node dist/server.js",
     "deploy": "npm run rebuild; npm run deploy",
-    "dev": "tsc-watch --build tsconfig.json --onSuccess 'node dist/server.js' --onCompilationComplete 'npm run build-client'",
+    "dev": "LOGGING=1 SSL=1 tsc-watch --build tsconfig.json --onSuccess 'node dist/server.js' --onCompilationComplete 'npm run build-client'",
     "test": "exit 0"
   },
   "author": "abetaev",

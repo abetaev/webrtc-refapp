@@ -119,8 +119,6 @@
 
   <script>
 
-  const n = 3;
-
   const orientations = { "landscape" : "portrait" , "portrait" : "landscape" }
   const dicts = { 
     "portrait": {
@@ -165,7 +163,7 @@
 
   <script>
 
-  function handleInputStream(stream) {
+  function handleInputStream(peer, stream) {
     console.log('handling input stream')
     const { id } = stream;
     if (document.getElementById(id)) {
@@ -183,39 +181,24 @@
   }
 
   async function copyToClipboard() {
-    const localStream = document.querySelector("aside > video").srcObject
-    join(
-      localStream,
-      (url) => {
-        const shareUrl = `${document.URL}?join=${encodeURI(url)}`
-        const text = encodeURIComponent('join me')
-        navigator.clipboard.writeText(url)
-      },
-      handleInputStream
-    )
+    sendTo__((url) => navigator.clipboard.writeText(url))
   }
 
   async function sendToTelegram() {
-    const localStream = document.querySelector("aside > video").srcObject
-    join(
-      localStream,
-      (url) => {
-        const shareUrl = `${document.URL}?join=${encodeURI(url)}`
-        const text = encodeURIComponent('join me')
-        window.open(`https://telegram.me/share/url?url=${encodeURI(shareUrl)}`)
-      },
-      handleInputStream
-    )
+    sendTo__((url) => window.open(`https://telegram.me/share/url?url=${encodeURI(url)}`))
   }
 
   async function sendViaEmail() {
+    sendTo__((url) => window.open(`mailto:?body=${encodeURI(url)}`))
+  }
+
+  async function sendTo__(handler) {
     const localStream = document.querySelector("aside > video").srcObject
     join(
       localStream,
-      (url) => {
-        const shareUrl = `${document.URL}?join=${encodeURI(url)}`
-        // const text = encodeURIComponent('join me')
-        window.open(`mailto:?body=${encodeURI(shareUrl)}`)
+      url => {
+        const documentURL = new URL(document.URL)
+        handler(`${documentURL.protocol}//${documentURL.host}/?join=${encodeURI(url)}`)
       },
       handleInputStream
     )

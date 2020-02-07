@@ -3,10 +3,10 @@ export type SignallingConnection = {
   sendMessage: (message: any) => void
 }
 
-export async function join(meetingServer: string):
+export async function issueInvite(meetingServer: string):
   Promise<{
     dialogHandler: SignallingConnection,
-    joinUrl: string
+    inviteUrl: string
   }> {
 
   const socket = new WebSocket(meetingServer)
@@ -19,7 +19,7 @@ export async function join(meetingServer: string):
 
   return {
     dialogHandler: handler(socket),
-    joinUrl: `${meetingServer}${token}`
+    inviteUrl: `${meetingServer}${token}`
   }
 
 }

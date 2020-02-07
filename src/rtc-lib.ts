@@ -1,4 +1,4 @@
-import * as server from './signalling'
+import { issueInvite as issueInvitation, accept as acceptInvitation } from './signalling'
 import { SignallingConnection } from './signalling'
 
 export interface Connection {
@@ -6,7 +6,7 @@ export interface Connection {
   ctrl: RTCDataChannel
 }
 
-type Call = {
+type Meeting = {
   peer: RTCPeerConnection
   init: () => Promise<void> // resolves when it's ready
 }
@@ -26,24 +26,24 @@ function createPeer(dialogHandler: SignallingConnection, configuration?: RTCConf
   return peer
 }
 
-export async function join(
+export async function inviteAt(
   meetingServer: string,
   configuration?: RTCConfiguration
-): Promise<Call & { joinUrl: string }> {
-  const { dialogHandler, joinUrl } = await server.join(meetingServer)
+): Promise<Meeting & { inviteUrl: URL }> {
+  const { dialogHandler, inviteUrl } = await issueInvitation(meetingServer)
   const peer = createPeer(dialogHandler, configuration)
   return {
-    joinUrl,
+    inviteUrl: new URL(inviteUrl),
     peer,
     init: () => handlePeerDialog(peer, dialogHandler)
   }
 }
 
-export async function accept(
-  joinUrl: string,
+export async function meet(
+  inviteUrl: URL,
   configuration?: RTCConfiguration
-): Promise<Call> {
-  const dialogHandler = await server.accept(joinUrl)
+): Promise<Meeting> {
+  const dialogHandler = await acceptInvitation(inviteUrl.toString())
   const peer = createPeer(dialogHandler, configuration)
   return {
     peer,
@@ -51,10 +51,10 @@ export async function accept(
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer)
       dialogHandler.sendMessage(offer)
-      handlePeerDialog(
+      await handlePeerDialog(
         peer,
         dialogHandler
-      )
+      );
     }
   }
 }
@@ -68,6 +68,7 @@ async function handlePeerDialog(
   peer: RTCPeerConnection,
   { onMessage, sendMessage }: SignallingConnection
 ) {
+  console.log('handling peer dialog')
   await new Promise((resolve, reject) => {
     onMessage(
       async (event: CandidateEvent | OfferEvent | AnswerEvent | ErrorEvent) => {
@@ -105,5 +106,5 @@ async function handlePeerDialog(
         }
       })
   })
-
+  console.log('peer connection negotiated')
 }
