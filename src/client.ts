@@ -1,44 +1,47 @@
-import * as network from './network'
+import * as NETWORK from './network'
+import uuid = require('uuid');
 require('webrtc-adapter');
+import { Meeting, StreamHandler } from './network'
 
-const url = new URL(document.URL)
-
-const stunServerUrl = `stun:${url.hostname}:3478`
-let meetingServer = `wss://${url.host}/`
+let meetingServer = `wss://${(new URL(document.URL)).host}/`
 
 // config
 
-const rtcConfiguration: RTCConfiguration = {
-  iceServers: [{
-    urls: [
-      stunServerUrl,
-      'stun:stun.l.google.com:19302'
-    ]
-  }]
-};
+let meeting: Meeting = null
+
+const createMeeting = (
+  stream: MediaStream,
+  handleStream: StreamHandler
+): Meeting => ({
+  stream,
+  handleStream: handleStream,
+  conversations: {},
+  meetingServer,
+  network: {
+    id: uuid(),
+    peers: []
+  }
+})
 
 Object.assign(window, {
-  join: (
+  join: async (
     stream: MediaStream,
     sendInvite: (url: string) => void,
-    streamHandler: (peer: string, stream: MediaStream) => void
+    handleStream: (peer: string, stream: MediaStream) => void
   ) => {
-    network.initiateMeeting(
-      meetingServer,
-      sendInvite,
-      stream,
-      (peer, stream) => streamHandler(peer, stream)
-    )
+    if (!meeting) {
+      meeting = createMeeting(stream, handleStream)
+    }
+    NETWORK.issueInvitation(meeting, sendInvite);
   },
-  accept: (
+  accept: async (
     stream: MediaStream,
     invitation: string,
-    streamHandler: (id: string, stream: MediaStream) => void
+    handleStream: (id: string, stream: MediaStream) => void
   ) => {
-    network.joinMeeting(
-      invitation,
-      stream,
-      (peer, stream) => streamHandler(peer, stream)
-    )
+    if (!meeting) {
+      meeting = createMeeting(stream, handleStream);
+    }
+    NETWORK.acceptInvitation(meeting, invitation);
   }
 })

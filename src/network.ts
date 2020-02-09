@@ -9,123 +9,135 @@ export interface Network {
 type Conversation = {
   peer: RTCPeerConnection
   controlChannel: RTCDataChannel
-  stream: MediaStream
-  handleStream: StreamHandler
-  network: Network
-  meetingServer: string
 }
 
-type StreamHandler = (id: string, stream: MediaStream) => void
+export type Meeting = {
+  stream: MediaStream
+  network: Network
+  meetingServer: string
+  handleStream: StreamHandler
+  conversations: { [peerId: string]: Conversation }
+}
 
-export async function initiateMeeting(
-  meetingServer: string,
-  sendInvite: (inviteUrl: string) => void,
-  stream: MediaStream,
-  peerHandler: StreamHandler,
-  network: Network = { id: uuid(), peers: [] },
-): Promise<Network> {
+
+export type StreamHandler = (id: string, stream: MediaStream) => void
+
+export async function issueInvitation(
+  meeting: Meeting,
+  sendInvite: (inviteUrl: string) => void) {
+
+  console.log(`i am ${meeting.network.id} issuing invitation`)
+
+  const { meetingServer, stream, handleStream } = meeting
 
   const { peer, init, inviteUrl } = await inviteAt(meetingServer);
 
-  // defineConversation(peer, stream);
+  // declare own resources to share
+  defineConversation(peer, stream, handleStream);
 
-  console.log('creating control channel')
-  const controlChannel = peer.createDataChannel("control");
-  controlChannel.onopen = () => {
-    console.log('control channel is open')
-    startConversation({
-      peer,
-      controlChannel,
-      stream,
-      handleStream: peerHandler,
-      network,
-      meetingServer
-    })
-  }
-
-  sendInvite(inviteUrl.toString());
-
-  await init();
-
-  console.log('peer connection initiated')
-
-  return network;
-}
-
-export async function joinMeeting(
-  invitation: string,
-  stream: MediaStream,
-  peerHandler: StreamHandler,
-  network: Network = { id: uuid(), peers: [] },
-): Promise<Network> {
-
-  const inviteUrl = new URL(invitation);
-
-  const { peer, init } = await meet(inviteUrl);
-
-  // defineConversation(peer, stream);
-//FIXMEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
   await new Promise(
     async (resolve, reject) => {
       console.log('attaching to control channel')
-      peer.ondatachannel = async ({ channel }) => {
-        if (channel.label !== "control") {
-          reject(`channel "${channel.label}" is not supported`);
+      peer.ondatachannel = async ({ channel: controlChannel }) => {
+        if (controlChannel.label !== "control") {
+          // principle: incompatible? fail: *fail fast*!
+          controlChannel.close()
+          peer.close()
+          reject(`channel "${controlChannel.label}" is not supported`);
         }
 
         console.log('attached to control channel')
 
-        await startConversation({
+        await startConversation(meeting, {
           peer,
-          controlChannel: channel,
-          stream,
-          handleStream: peerHandler,
-          network,
-          meetingServer: `${inviteUrl.protocol}//${inviteUrl.host}/`
+          controlChannel
         })
 
         resolve();
       }
 
+      sendInvite(inviteUrl.toString());
+
       await init();
 
       console.log('peer connection initiated')
-    
+
     }
   );
 
-  return network;
+  return meeting;
 }
 
-function defineConversation(peer: RTCPeerConnection, stream: MediaStream) {
+export async function acceptInvitation(
+  meeting: Meeting,
+  invitation: string
+) {
+  console.log(`network ${JSON.stringify(meeting.network)}
+joins meeting: ${invitation}`)
+
+  const inviteUrl = new URL(invitation);
+
+  const { peer, init } = await meet(inviteUrl);
+  const { stream, handleStream } = meeting
+
+  defineConversation(peer, stream, handleStream);
+
+  console.log('creating control channel')
+  const controlChannel = peer.createDataChannel("control");
+  controlChannel.onopen = () => {
+    console.log('control channel is open')
+    startConversation(meeting, {
+      peer,
+      controlChannel
+    })
+  }
+
+  await init();
+
+  console.log('peer connection initiated')
+
+  return meeting;
+}
+
+
+function defineConversation(
+  peer: RTCPeerConnection,
+  stream: MediaStream,
+  handleStream: StreamHandler
+) {
   console.log('defining conversation')
-  stream.getTracks().forEach(track => peer.addTrack(track, stream))
+  stream.getTracks()
+    .forEach(track => peer.addTrack(track, stream))
+  peer.ontrack = ({ streams: [stream] }) => {
+    console.log(stream)
+    handleStream('unknown', stream);
+  }
 }
 
-async function startConversation(conversation: Conversation) {
+async function startConversation(meeting: Meeting, conversation: Conversation) {
   console.log('starting conversation')
 
-  const { peer } = conversation
+  const network = await setupControlChannel(meeting, conversation);
 
-  const { network } = await setupControlChannel(conversation);
+  meeting.conversations[network.id] = conversation;
 
-  peer.ontrack = ({ streams: [stream] }) =>
-    conversation.handleStream(network.id, stream)
+  console.log(`control channel established, received peer network: ${JSON.stringify(network)}`)
 
-  extendNetwork(conversation, network.id, network.peers);
+  extendNetwork(meeting, conversation, network.id, network.peers);
 }
 
 
-async function setupControlChannel(conversation: Conversation):
-  Promise<HelloMessage> {
+async function setupControlChannel(meeting: Meeting, conversation: Conversation): Promise<Network> {
 
   console.log('initiating control connection')
 
-  const { peer, controlChannel, network } = conversation
+  const { peer, controlChannel } = conversation
+  const { network } = meeting
 
   controlChannel.onerror = (e) => console.log(e);
 
   // generously introduce ourselves and provide list of peers we know
+  console.log(`introducing ourselves: ${JSON.stringify(network)}`)
   sendControlMessage(conversation, {
     type: "hello",
     network
@@ -142,10 +154,11 @@ async function setupControlChannel(conversation: Conversation):
   console.log(`received greeting from ${message.network.id}
 who knows ${JSON.stringify(message.network.peers)}`)
 
+  // then just await pings and echos
   controlChannel.onmessage =
-    ({ data }) => handleControlMessage(conversation, data);
+    ({ data }) => handleControlMessage(meeting, conversation, message.network.peers, JSON.parse(data));
 
-  return message;
+  return message.network;
 
 }
 
@@ -174,20 +187,35 @@ function sendControlMessage(conversation: Conversation, message: ControlMessage)
   controlChannel.send(JSON.stringify(message))
 }
 
-function handleControlMessage(conversation: Conversation, message: ControlMessage) {
-  const { peer, controlChannel, stream, handleStream: peerHandler, network } = conversation;
+async function handleControlMessage(
+  meeting: Meeting,
+  conversation: Conversation,
+  peers: string[],
+  message: ControlMessage
+) {
+  const { peer, controlChannel } = conversation;
+  const { network } = meeting
 
-  if (message.to && message.to !== network.id) {
-    if (network.peers[message.to]) {
-      network.peers[message.to].send(message)
+  const { to } = message
+
+  if (to && to !== network.id) {
+    if (network.peers.includes(to)) {
+      console.log(`forwarding message`);
+      sendControlMessage(meeting.conversations[to], message);
+      return;
+    } else if (peers.includes(to)) {
+      console.log(`forwarding`)
+      sendControlMessage(conversation, message);
       return;
     } else {
-      throw new Error(`undeliverable message to ${message.to}`)
+      throw new Error(`undeliverable message: ${JSON.stringify(message)}`)
     }
   }
 
   if (message.type === "join") {
-    joinMeeting(message.invitation, stream, peerHandler, network)
+    console.log("it's a join request!")
+    const network = await acceptInvitation(meeting, message.invitation)
+    Object.assign(conversation, { network })
   } else {
     controlChannel.close();
     peer.close(); // any protocol violation causes abort
@@ -196,16 +224,20 @@ function handleControlMessage(conversation: Conversation, message: ControlMessag
 
 }
 
-function extendNetwork(connection: Conversation, peer: string, peers: string[]) {
-  const { network, stream, handleStream, meetingServer } = connection
+function extendNetwork(meeting: Meeting, conversation: Conversation, peer: string, peers: string[]) {
+  const { network } = meeting
+
+  console.log(`extending network`)
 
   const knownPeers = Object.keys(network.peers)
+  console.log({ peers, peer, knownPeers })
   const newPeers = peers.filter(peer => !knownPeers.includes(peer))
   const oldPeers = knownPeers.filter(knownPeer => !newPeers.includes(knownPeer))
 
   if (!knownPeers.includes(peer)) {
     console.log(`connected with ${peer}`);
-    network.peers.push(peer);
+    meeting.network.peers.push(peer);
+    meeting.conversations[peer] = conversation;
   }
 
   console.log(`old peers: ${JSON.stringify(oldPeers)}`)
@@ -214,18 +246,17 @@ function extendNetwork(connection: Conversation, peer: string, peers: string[]) 
 
   newPeers.forEach(async (newPeer) => {
     console.log(`inviting: ${newPeer}`)
-    initiateMeeting(
-      meetingServer,
-      async (invitation) => sendControlMessage(connection, {
+    issueInvitation(
+      meeting,
+      (invitation) => sendControlMessage(conversation, {
         to: newPeer,
         type: "join",
         invitation
-      }),
-      stream,
-      handleStream,
-      network
+      })
     )
   })
+
+  console.log(`network extended: ${JSON.stringify(network)}`)
 
 }
 

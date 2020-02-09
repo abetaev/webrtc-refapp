@@ -6,13 +6,22 @@ export interface Connection {
   ctrl: RTCDataChannel
 }
 
+const rtcConfiguration: RTCConfiguration = {
+  iceServers: [{
+    urls: [
+      `stun:${(new URL(document.URL)).hostname}:3478`,
+      'stun:stun.l.google.com:19302'
+    ]
+  }]
+};
+
 type Meeting = {
   peer: RTCPeerConnection
   init: () => Promise<void> // resolves when it's ready
 }
 
-function createPeer(dialogHandler: SignallingConnection, configuration?: RTCConfiguration): RTCPeerConnection {
-  const peer = new RTCPeerConnection(configuration)
+function createPeer(dialogHandler: SignallingConnection): RTCPeerConnection {
+  const peer = new RTCPeerConnection(rtcConfiguration)
   peer.onicecandidate = (event: RTCPeerConnectionIceEvent) => {
     const { candidate } = event
     if (candidate) {
@@ -26,12 +35,9 @@ function createPeer(dialogHandler: SignallingConnection, configuration?: RTCConf
   return peer
 }
 
-export async function inviteAt(
-  meetingServer: string,
-  configuration?: RTCConfiguration
-): Promise<Meeting & { inviteUrl: URL }> {
+export async function inviteAt(meetingServer: string): Promise<Meeting & { inviteUrl: URL }> {
   const { dialogHandler, inviteUrl } = await issueInvitation(meetingServer)
-  const peer = createPeer(dialogHandler, configuration)
+  const peer = createPeer(dialogHandler)
   return {
     inviteUrl: new URL(inviteUrl),
     peer,
@@ -39,12 +45,9 @@ export async function inviteAt(
   }
 }
 
-export async function meet(
-  inviteUrl: URL,
-  configuration?: RTCConfiguration
-): Promise<Meeting> {
+export async function meet(inviteUrl: URL): Promise<Meeting> {
   const dialogHandler = await acceptInvitation(inviteUrl.toString())
-  const peer = createPeer(dialogHandler, configuration)
+  const peer = createPeer(dialogHandler)
   return {
     peer,
     init: async () => {
