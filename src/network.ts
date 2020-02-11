@@ -1,5 +1,4 @@
 import { meet, inviteAt } from './rtc-lib'
-import uuid from 'uuid'
 
 export interface Network {
   id: string
@@ -9,31 +8,29 @@ export interface Network {
 type Conversation = {
   peer: RTCPeerConnection
   controlChannel: RTCDataChannel
+  stream: MediaStream
 }
 
 export type Meeting = {
   stream: MediaStream
   network: Network
   meetingServer: string
-  handleStream: StreamHandler
   conversations: { [peerId: string]: Conversation }
+  on: (event: 'connect' | 'disconnect', peer: string) => void
 }
-
-
-export type StreamHandler = (id: string, stream: MediaStream) => void
 
 export async function issueInvitation(
   meeting: Meeting,
-  sendInvite: (inviteUrl: string) => void) {
+  sendInvite: (inviteUrl: URL) => void) {
 
   console.log(`i am ${meeting.network.id} issuing invitation`)
 
-  const { meetingServer, stream, handleStream } = meeting
+  const { meetingServer, stream } = meeting
 
   const { peer, init, inviteUrl } = await inviteAt(meetingServer);
 
   // declare own resources to share
-  defineConversation(peer, stream, handleStream);
+  const conversation = defineConversation(peer, stream);
 
   await new Promise(
     async (resolve, reject) => {
@@ -47,16 +44,16 @@ export async function issueInvitation(
         }
 
         console.log('attached to control channel')
+        conversation.controlChannel = controlChannel
 
-        await startConversation(meeting, {
-          peer,
-          controlChannel
-        })
+        controlChannel.onopen = async () => {
+          await startConversation(meeting, conversation)
+          resolve();
+        }
 
-        resolve();
       }
 
-      sendInvite(inviteUrl.toString());
+      sendInvite(inviteUrl);
 
       await init();
 
@@ -78,18 +75,16 @@ joins meeting: ${invitation}`)
   const inviteUrl = new URL(invitation);
 
   const { peer, init } = await meet(inviteUrl);
-  const { stream, handleStream } = meeting
+  const { stream } = meeting
 
-  defineConversation(peer, stream, handleStream);
+  const conversation = defineConversation(peer, stream);
 
   console.log('creating control channel')
   const controlChannel = peer.createDataChannel("control");
   controlChannel.onopen = () => {
-    console.log('control channel is open')
-    startConversation(meeting, {
-      peer,
-      controlChannel
-    })
+    console.log('control channel is open');
+    conversation.controlChannel = controlChannel;
+    startConversation(meeting, conversation)
   }
 
   await init();
@@ -102,16 +97,32 @@ joins meeting: ${invitation}`)
 
 function defineConversation(
   peer: RTCPeerConnection,
-  stream: MediaStream,
-  handleStream: StreamHandler
-) {
+  stream: MediaStream
+): Conversation {
   console.log('defining conversation')
+
+  const conversation: Conversation = {
+    peer: null as RTCPeerConnection,
+    controlChannel: null as RTCDataChannel,
+    stream: null as MediaStream
+  }
+
   stream.getTracks()
     .forEach(track => peer.addTrack(track, stream))
   peer.ontrack = ({ streams: [stream] }) => {
-    console.log(stream)
-    handleStream('unknown', stream);
+    console.log(`received media stream: ${stream.id}`)
+    conversation.stream && console.log(`measurement: ${conversation.stream.id}, ${stream.id}`)
+    if (conversation.stream === null) {
+      conversation.stream = stream;
+    } else if (conversation.stream.id !== stream.id) {
+      peer.close()
+      throw new Error(`peer tries to send more than one media stream: ${stream.id}`)
+    }
   }
+
+  Object.assign(conversation, { peer })
+
+  return conversation;
 }
 
 async function startConversation(meeting: Meeting, conversation: Conversation) {
@@ -156,7 +167,11 @@ who knows ${JSON.stringify(message.network.peers)}`)
 
   // then just await pings and echos
   controlChannel.onmessage =
-    ({ data }) => handleControlMessage(meeting, conversation, message.network.peers, JSON.parse(data));
+    ({ data }) => handleControlMessage(
+      meeting,
+      conversation,
+      JSON.parse(data)
+    );
 
   return message.network;
 
@@ -190,32 +205,26 @@ function sendControlMessage(conversation: Conversation, message: ControlMessage)
 async function handleControlMessage(
   meeting: Meeting,
   conversation: Conversation,
-  peers: string[],
   message: ControlMessage
 ) {
   const { peer, controlChannel } = conversation;
   const { network } = meeting
 
-  const { to } = message
+  const { to, type } = message
 
-  if (to && to !== network.id) {
+  if (to && to !== network.id && type === "join") {
     if (network.peers.includes(to)) {
       console.log(`forwarding message`);
       sendControlMessage(meeting.conversations[to], message);
-      return;
-    } else if (peers.includes(to)) {
-      console.log(`forwarding`)
-      sendControlMessage(conversation, message);
-      return;
     } else {
       throw new Error(`undeliverable message: ${JSON.stringify(message)}`)
     }
+    return;
   }
 
   if (message.type === "join") {
     console.log("it's a join request!")
-    const network = await acceptInvitation(meeting, message.invitation)
-    Object.assign(conversation, { network })
+    await acceptInvitation(meeting, message.invitation)
   } else {
     controlChannel.close();
     peer.close(); // any protocol violation causes abort
@@ -229,15 +238,17 @@ function extendNetwork(meeting: Meeting, conversation: Conversation, peer: strin
 
   console.log(`extending network`)
 
-  const knownPeers = Object.keys(network.peers)
-  console.log({ peers, peer, knownPeers })
-  const newPeers = peers.filter(peer => !knownPeers.includes(peer))
-  const oldPeers = knownPeers.filter(knownPeer => !newPeers.includes(knownPeer))
+  const newPeers = peers.filter(peer => !network.peers.includes(peer))
+  const oldPeers = network.peers.filter(knownPeer => !newPeers.includes(knownPeer))
 
-  if (!knownPeers.includes(peer)) {
+  if (!network.peers.includes(peer)) {
     console.log(`connected with ${peer}`);
     meeting.network.peers.push(peer);
     meeting.conversations[peer] = conversation;
+    meeting.on('connect', peer)
+    conversation.peer.onconnectionstatechange =
+      () => conversation.peer.connectionState === "disconnected"
+        && meeting.on('disconnect', peer);
   }
 
   console.log(`old peers: ${JSON.stringify(oldPeers)}`)
@@ -248,10 +259,10 @@ function extendNetwork(meeting: Meeting, conversation: Conversation, peer: strin
     console.log(`inviting: ${newPeer}`)
     issueInvitation(
       meeting,
-      (invitation) => sendControlMessage(conversation, {
+      (inviteUrl) => sendControlMessage(conversation, {
         to: newPeer,
         type: "join",
-        invitation
+        invitation: inviteUrl.toString()
       })
     )
   })

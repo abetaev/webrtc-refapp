@@ -4,7 +4,7 @@
   "description": "",
   "scripts": {
     "clean": "rm -r dist .cache node_modules; npm ci",
-    "build-client": "parcel build -t browser src/client.ts --out-file dist/client.js; cp index.html dist",
+    "build-client": "parcel build -t browser src/client.ts --out-file dist/client.js; cp static/* dist/",
     "build-server": "parcel build -t node src/server.ts --out-file dist/server.js",
     "build": "npm run build-client; npm run build-server",
     "rebuild": "npm run clean; npm run build",

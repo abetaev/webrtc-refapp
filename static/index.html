@@ -13,8 +13,6 @@
   <link rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/cash/6.0.1/cash.min.js"></script>
-
   <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard-polyfill/2.8.6/clipboard-polyfill.js"></script>
 
   <script src="client.js"></script>
@@ -37,6 +35,7 @@
       top: 0;
       justify-content: center;
       justify-items: center;
+      grid-template-rows: min-content 100%;
     }
 
     body {
@@ -51,9 +50,11 @@
     }
 
     main {
-      display: flex;
+      width: 100vw;
       height: 100%;
-      width: 100%;
+      justify-content: center;
+      vertical-align: middle;
+      display: flex;
     }
 
     main.portrait {
@@ -71,6 +72,8 @@
     aside {
       display: block;
       position: absolute;
+      width: min-content;
+      height: min-content;
       left: 0;
       bottom: 0;
     }
@@ -119,67 +122,6 @@
 
   <script>
 
-  const orientations = { "landscape" : "portrait" , "portrait" : "landscape" }
-  const dicts = { 
-    "portrait": {
-      "windowSizeName": "innerWidth",
-      "sizeName": "width"
-    },
-    "landscape": {
-      "windowSizeName": "innerHeight",
-      "sizeName": "height"
-    }
-  }
-
-  function resize() {
-    const currentOrientation =
-            window.innerHeight > window.innerWidth ?
-              "portrait" :
-              "landscape";
-
-    const oppositeOrientation = orientations[currentOrientation];
-    const { sizeName: sizeNameCurrent,
-            windowSizeName: windowSizeNameCurrent }
-             = dicts[currentOrientation]
-    const { sizeName: sizeNameOpposite,
-            windowSizeName: windowSizeNameOpposite }
-             = dicts[oppositeOrientation]
-    const windowCurrentSize = window[windowSizeNameCurrent]
-    const windowOppositeSize = window[windowSizeNameOpposite]
-
-    $("main > video").css(sizeNameCurrent, windowCurrentSize);
-    $("main > video").css(sizeNameOpposite, '');
-    $("main").removeClass(oppositeOrientation);
-    $("main").addClass(currentOrientation);
-
-    $("aside > video").css(sizeNameCurrent, `${windowCurrentSize * .20}px`);
-    $("aside > video").css(sizeNameOpposite, '');
-
-  }
-
-  window.onresize = resize;
-  
-  </script>
-
-  <script>
-
-  function handleInputStream(peer, stream) {
-    console.log('handling input stream')
-    const { id } = stream;
-    if (document.getElementById(id)) {
-      console.log('stream is already playin')
-      return;
-    }
-    const video = Object.assign(document.createElement("video"), {
-      id,
-      autoplay: true,
-      srcObject: stream
-    })
-    video.load()
-    $("main").append(video)
-    resize()
-  }
-
   async function copyToClipboard() {
     sendTo__((url) => navigator.clipboard.writeText(url))
   }
@@ -199,37 +141,9 @@
       url => {
         const documentURL = new URL(document.URL)
         handler(`${documentURL.protocol}//${documentURL.host}/?join=${encodeURI(url)}`)
-      },
-      handleInputStream
+      }
     )
   }
-
-  (async () => {
-
-    const localStream = await navigator.mediaDevices.getUserMedia(
-                          { video:true, audio: true }
-                        )
-
-    const video = Object.assign(document.createElement("video"), {
-      muted:      true,
-      autoplay:   true,
-      srcObject:  localStream,
-    });
-    video.load();
-    $("aside").append(video);
-
-    const joinUrl = new URL(document.URL).searchParams.get("join")
-    if (joinUrl) {
-      accept(
-        localStream,
-        joinUrl,
-        handleInputStream
-      )
-    }
-
-    resize()
-
-  })()
 
   </script>
 
