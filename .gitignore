@@ -1,4 +1,5 @@
-/dist/
+/peer/
+/beacon/
 /node_modules/
 /.cache/
 /.vscode/

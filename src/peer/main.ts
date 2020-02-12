@@ -1,5 +1,6 @@
 import * as NETWORK from './network';
 import { Meeting } from './network';
+import noVideoPic from './no.png';
 import uuid = require('uuid');
 require('webrtc-adapter');
 
@@ -7,7 +8,7 @@ require('webrtc-adapter');
 const $ = <T extends HTMLElement>(selector: string) => document.querySelector(selector) as T
 const $$ = <T extends HTMLElement>(selector: string) => document.querySelectorAll(selector) as NodeListOf<T>
 
-let meetingServer = `wss://${(new URL(document.URL)).host}/`
+let beaconServer = `wss://${(new URL(document.URL)).host}/`
 
 // config
 
@@ -18,7 +19,7 @@ const createMeeting = (
 ): Meeting => ({
   stream,
   conversations: {},
-  meetingServer,
+  beaconServer,
   network: {
     id: uuid(),
     peers: []
@@ -43,20 +44,29 @@ const accept = (
   NETWORK.acceptInvitation(meeting, invitation);
 }
 
-
-Object.assign(window, {
-  join: (
-    stream: MediaStream,
-    sendInvite: (inviteUrl: URL) => void, /* convention: as long as it's
-                                             possible transport object
-                                             in deserialized view. */
-  ) => {
-    if (!meeting) {
-      meeting = createMeeting(stream)
-    }
-    NETWORK.issueInvitation(meeting, sendInvite);
+const join = (
+  stream: MediaStream,
+  sendInvite: (inviteUrl: URL) => void, /* convention: as long as it's
+                                           possible transport object
+                                           in deserialized view. */
+) => {
+  if (!meeting) {
+    meeting = createMeeting(stream)
   }
-});
+  NETWORK.issueInvitation(meeting, sendInvite);
+};
+
+const sendTo = (handler: (peer: string) => void) => {
+  const localStream: MediaStream =
+    $<HTMLVideoElement>("aside > video").srcObject as MediaStream;
+  join(
+    localStream,
+    url => {
+      const documentURL = new URL(document.URL)
+      handler(`${documentURL.protocol}//${documentURL.host}/?join=${encodeURI(url.toString())}`)
+    }
+  )
+}
 
 function addConversation(peer: string, stream: MediaStream) {
   console.log('displaying incomming video')
@@ -68,7 +78,7 @@ function addConversation(peer: string, stream: MediaStream) {
     id: peer,
     autoplay: true,
     srcObject: stream,
-    poster: 'no.png'
+    poster: noVideoPic
   })
 
   video.load()
@@ -123,8 +133,8 @@ const resize = (() => {
       node[sizeNameCurrent] = containerCurrentSize
       node[sizeNameOpposite] = Math.floor(containerCurrentSize * aspectRatio);
     });
-    $<HTMLElement>("main").classList.remove(oppositeOrientation);
-    $<HTMLElement>("main").classList.add(currentOrientation);
+    $("main").classList.remove(oppositeOrientation);
+    $("main").classList.add(currentOrientation);
 
     const asideVideo = $<HTMLVideoElement>("aside > video")
     let aspectRatio = asideVideo[videoSizeNameOpposite] / asideVideo[videoSizeNameCurrent]
@@ -137,7 +147,7 @@ const resize = (() => {
   }
 })();
 
-(async function main() {
+(async function start() {
 
   let audio = false;
   let video = false;
@@ -150,6 +160,7 @@ const resize = (() => {
     throw new Error("audio device is not available")
   }
 
+  // TODO: this one should originate from meeting, not vice versa
   const localStream = await navigator.mediaDevices.getUserMedia({ video, audio })
 
   const videoElement = Object.assign(document.createElement("video"), {
@@ -170,11 +181,21 @@ const resize = (() => {
 
   window.onresize = resize;
 
-  const scheduleResize = (interval: number) => setTimeout(() => {
-    resize();
-    scheduleResize(interval);
+  const schedule = (interval: number, op: () => void) => setTimeout(() => {
+    op();
+    schedule(interval, op);
   }, interval)
 
-  scheduleResize(100);
+  schedule(100, resize);
+
+  $<HTMLButtonElement>("nav > button[id='sendToTelegram']").onclick = () => {
+    sendTo((url) => window.open(`https://telegram.me/share/url?url=${encodeURI(url)}`))
+  }
+  $<HTMLButtonElement>("nav > button[id='sendToEmail']").onclick = () => {
+    sendTo((url) => window.open(`mailto:?body=${encodeURI(url)}`))
+  }
+  $<HTMLButtonElement>("nav > button[id='copyToClipboard']").onclick = () => {
+    sendTo((url) => navigator.clipboard.writeText(url))
+  }
 
 })();

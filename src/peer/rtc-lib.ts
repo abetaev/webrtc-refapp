@@ -35,8 +35,8 @@ function createPeer(dialogHandler: SignallingConnection): RTCPeerConnection {
   return peer
 }
 
-export async function inviteAt(meetingServer: string): Promise<Meeting & { inviteUrl: URL }> {
-  const { dialogHandler, inviteUrl } = await issueInvitation(meetingServer)
+export async function inviteAt(beaconServer: string): Promise<Meeting & { inviteUrl: URL }> {
+  const { dialogHandler, inviteUrl } = await issueInvitation(beaconServer)
   const peer = createPeer(dialogHandler)
   return {
     inviteUrl: new URL(inviteUrl),

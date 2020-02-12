@@ -14,7 +14,7 @@ type Conversation = {
 export type Meeting = {
   stream: MediaStream
   network: Network
-  meetingServer: string
+  beaconServer: string
   conversations: { [peerId: string]: Conversation }
   on: (event: 'connect' | 'disconnect', peer: string) => void
 }
@@ -25,9 +25,9 @@ export async function issueInvitation(
 
   console.log(`i am ${meeting.network.id} issuing invitation`)
 
-  const { meetingServer, stream } = meeting
+  const { beaconServer, stream } = meeting
 
-  const { peer, init, inviteUrl } = await inviteAt(meetingServer);
+  const { peer, init, inviteUrl } = await inviteAt(beaconServer);
 
   // declare own resources to share
   const conversation = defineConversation(peer, stream);

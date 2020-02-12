@@ -15,8 +15,6 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard-polyfill/2.8.6/clipboard-polyfill.js"></script>
 
-  <script src="client.js"></script>
-
   <style>
   
     #sendToTelegram {
@@ -106,12 +104,9 @@
   <div id="layout">
 
     <nav>
-      <button id="sendToTelegram"
-              onclick="sendToTelegram()">&nbsp;</button>
-      <button id="sendViaEmail"
-              onclick="sendViaEmail()">📧</button>
-      <button id="copyToClipboard"
-              onclick="copyToClipboard()">🔗</button>
+      <button id="sendToTelegram">&nbsp;</button>
+      <button id="sendToEmail">📧</button>
+      <button id="copyToClipboard">🔗</button>
     </nav>
 
     <main> <!-- conversations will appear here --> </main>
@@ -120,32 +115,7 @@
 
   <aside></aside>
 
-  <script>
-
-  async function copyToClipboard() {
-    sendTo__((url) => navigator.clipboard.writeText(url))
-  }
-
-  async function sendToTelegram() {
-    sendTo__((url) => window.open(`https://telegram.me/share/url?url=${encodeURI(url)}`))
-  }
-
-  async function sendViaEmail() {
-    sendTo__((url) => window.open(`mailto:?body=${encodeURI(url)}`))
-  }
-
-  async function sendTo__(handler) {
-    const localStream = document.querySelector("aside > video").srcObject
-    join(
-      localStream,
-      url => {
-        const documentURL = new URL(document.URL)
-        handler(`${documentURL.protocol}//${documentURL.host}/?join=${encodeURI(url)}`)
-      }
-    )
-  }
-
-  </script>
+  <script src="peer/main.ts"></script>
 
 </body>
 

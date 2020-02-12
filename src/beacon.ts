@@ -5,14 +5,16 @@ import http, { IncomingMessage, ServerResponse } from 'http'
 import { Server as FileServer } from 'node-static'
 import fs from 'fs'
 
-const fileServer = new FileServer("./dist")
+const fileServer = new FileServer("./peer")
+
+const dev = process.env['DEV'] && true
 
 const handler = (req: IncomingMessage, res: ServerResponse) => {
-  res.setHeader('Cache-Control', 'no-cache')
+  dev && res.setHeader('Cache-Control', 'no-cache')
   fileServer.serve(req, res)
 }
 
-const ssl = process.env['SSL']
+const ssl = (dev || process.env['SSL']) && true
 
 const rootServer = (
   ssl ?
@@ -71,21 +73,23 @@ function meet(host: WebSocket, guest: WebSocket) {
 
 }
 
+const logging = (dev || process.env.LOGGING) && true
+
 function log(...args: any) {
-  if (process.env.LOGGING) {
+  if (logging) {
     console.log(args)
   }
 }
 
 // STUN
 
-const stunSocket = require('dgram').createSocket({type: 'udp4', reuseAddr: true})
+// const stunSocket = require('dgram').createSocket({type: 'udp4', reuseAddr: true})
 
-var server = new (require('stun').StunServer)(stunSocket);
+// var server = new (require('stun').StunServer)(stunSocket);
 
-// Set log event handler
-server.on('log', function (log) {
-  console.log('STUN: %s : [%s] %s', new Date(), log.level, log.message);
-});
+// // Set log event handler
+// server.on('log', function (log) {
+//   console.log('STUN: %s : [%s] %s', new Date(), log.level, log.message);
+// });
 
-server.listen(3478, '0.0.0.0', (arg) => console.log(arg))
+// server.listen(3478, '0.0.0.0')

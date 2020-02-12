@@ -3,13 +3,13 @@ export type SignallingConnection = {
   sendMessage: (message: any) => void
 }
 
-export async function issueInvite(meetingServer: string):
+export async function issueInvite(beaconServer: string):
   Promise<{
     dialogHandler: SignallingConnection,
     inviteUrl: string
   }> {
 
-  const socket = new WebSocket(meetingServer)
+  const socket = new WebSocket(beaconServer)
 
   const tokenPromise = new Promise<string>((resolve) => {
     socket.onmessage = async ({ data: invitation }: MessageEvent) => resolve(invitation)
@@ -19,7 +19,7 @@ export async function issueInvite(meetingServer: string):
 
   return {
     dialogHandler: handler(socket),
-    inviteUrl: `${meetingServer}${token}`
+    inviteUrl: `${beaconServer}${token}`
   }
 
 }
