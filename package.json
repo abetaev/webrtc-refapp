@@ -3,15 +3,14 @@
   "version": "0.1.0",
   "description": "",
   "scripts": {
-    "build-peer": "parcel build -t browser src/peer.html -d peer -o index.html",
-    "build-beacon": "parcel build -t node src/beacon.ts -d beacon -o main.js",
+    "build-peer": "node build.js browser src/peer.html peer/index.html",
+    "build-beacon": "node build.js node src/beacon.ts beacon/main.js",
     "build": "npm run build-peer; npm run build-beacon",
-    "clean": "rm -r peer beacon .cache node_modules; npm ci",
+    "clean": "rm -rf peer beacon .cache node_modules; npm install",
     "rebuild": "npm run clean; npm run build",
     "deploy": "npm run rebuild; gcloud app deploy",
     "start": "node beacon/main.js",
-    "build-start": "npm run build; npm start",
-    "dev": "DEV=1 watch-restart -g 'src/**/*' -- npm run build-start",
+    "dev": "node dev.js",
     "test": "exit 0"
   },
   "author": "abetaev",
@@ -23,13 +22,16 @@
     "ws": "^7.2.1"
   },
   "devDependencies": {
+    "@types/node": "^13.7.1",
     "@types/node-static": "^0.7.3",
     "@types/uuid": "^3.4.7",
     "@types/ws": "^7.2.1",
     "jest": "^24.9.0",
-    "parcel": "^1.12.4",
+    "node-watch": "^0.6.3",
+    "parcel-bundler": "^1.12.4",
+    "preact": "^10.3.1",
+    "preact-material-components": "^1.6.1",
     "typescript": "^3.7.5",
-    "watch-util": "^1.0.4",
     "webrtc-adapter": "^7.5.0"
   }
 }

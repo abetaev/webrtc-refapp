@@ -1,9 +1,6 @@
 {
-  "includes": [
-    "src/*.ts",
-  ],
   "compilerOptions": {
-    "esModuleInterop": true,
-    "outDir": "dist"
+      "jsx": "react",
+      "jsxFactory": "h"
   }
 }

@@ -2,121 +2,19 @@
 <html>
 
 <head>
-
   <title>queetings</title>
-
   <meta charset="UTF-8">
-
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1">
-
-  <link rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard-polyfill/2.8.6/clipboard-polyfill.js"></script>
-
-  <style>
-  
-    #sendToTelegram {
-      background-image: url("https://telegram.org/img/t_logo.png");
-      background-size: 60%;
-      background-position: center;
-      background-repeat: no-repeat;
-    }
-    
-    #layout {
-      display: grid;
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      left: 0;
-      top: 0;
-      justify-content: center;
-      justify-items: center;
-      grid-template-rows: min-content 100%;
-    }
-
-    body {
-      overflow: hidden;
-    }
-
-    nav {
-      display: flex;
-      flex-wrap: wrap;
-      width: max-content;
-      justify-content: center;
-    }
-
-    main {
-      width: 100vw;
-      height: 100%;
-      justify-content: center;
-      vertical-align: middle;
-      display: flex;
-    }
-
-    main.portrait {
-      overflow-x: hidden;
-      overflow-y: scroll;
-      flex-wrap: wrap;
-    }
-
-    main.landscape {
-      overflow-x: scroll;
-      overflow-y: hidden;
-      flex-wrap: nowrap;
-    }
-
-    aside {
-      display: block;
-      position: absolute;
-      width: min-content;
-      height: min-content;
-      left: 0;
-      bottom: 0;
-    }
-
-    input {
-      padding: 0px;
-      margin: 4px;
-      height: 3em - 8px;
-      width: max-content;
-      min-width: min-content;
-      border: none;
-      border-bottom: 1px solid teal;
-    }
-
-    button {
-      width: 3em;
-      min-width: 3em;
-      height: 3em;
-      background: white;
-      border: 1px black solid;
-      margin: 3px;
-    }
-
-  </style>
-
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 </head>
 
 <body>
-
-  <div id="layout">
-
-    <nav>
-      <button id="sendToTelegram">&nbsp;</button>
-      <button id="sendToEmail">📧</button>
-      <button id="copyToClipboard">🔗</button>
-    </nav>
-
-    <main> <!-- conversations will appear here --> </main>
-
-  </div>
-
-  <aside></aside>
-
-  <script src="peer/main.ts"></script>
-
+  <noscript>
+    <a href="https://en.wikipedia.org/wiki/JavaScript">javascript</a>
+    &nbsp;is not&nbsp;
+    <a href='https://www.enable-javascript.com/'><b>ENABLE</b></a>d
+  </noscript>
+  <script src="peer/main.tsx"></script>
 </body>
 
 </html>

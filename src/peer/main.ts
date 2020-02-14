@@ -125,13 +125,14 @@ const resize = (() => {
     const containerCurrentSize = container[containerSizeNameCurrent]
     const containerOppositeSize = container[containerSizeNameOpposite] as unknown as number
 
-    $$<HTMLVideoElement>("main > video").forEach(node => {
+    $$<HTMLVideoElement>("main > video").forEach((node: HTMLVideoElement) => {
       let aspectRatio = node[videoSizeNameOpposite] / node[videoSizeNameCurrent]
       if (Number.isNaN(aspectRatio)) {
         aspectRatio = containerOppositeSize / containerCurrentSize
       }
       node[sizeNameCurrent] = containerCurrentSize
       node[sizeNameOpposite] = Math.floor(containerCurrentSize * aspectRatio);
+      node.onclick = ({ target }: MouseEvent) => showChat(target as HTMLVideoElement)
     });
     $("main").classList.remove(oppositeOrientation);
     $("main").classList.add(currentOrientation);
@@ -144,6 +145,7 @@ const resize = (() => {
     asideVideo[sizeNameCurrent] = Math.floor(containerCurrentSize * .20);
     asideVideo[sizeNameOpposite] = asideVideo[sizeNameCurrent] * aspectRatio;
 
+    $("div[id='chat']").onclick = () => hideChat()
   }
 })();
 
@@ -158,6 +160,9 @@ const resize = (() => {
 
   if (!audio) {
     throw new Error("audio device is not available")
+  }
+  if (!video) {
+    console.log("video device is not available")
   }
 
   // TODO: this one should originate from meeting, not vice versa
@@ -199,3 +204,24 @@ const resize = (() => {
   }
 
 })();
+
+function showChat(videoElement: HTMLVideoElement) {
+  Object.assign($("div[id='chat']").style, {
+    display: "block",
+    position: "absolute",
+    left: `${videoElement.offsetLeft}px`,
+    top: `${videoElement.offsetTop}px`,
+    width: `${videoElement.width}px`,
+    height: `${videoElement.height}px`,
+    backgroundColor: "#00000077",
+    visibility: "visible",
+    zIndex: "255"
+  });
+  $("div[id='chat'] > input").focus()
+}
+
+function hideChat() {
+  Object.assign($("div[id='chat']").style, {
+    display: "none"
+  })
+}
