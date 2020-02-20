@@ -1,13 +1,13 @@
-import { h, JSX, RefObject } from 'preact'
+import { h, JSX } from 'preact'
 import 'preact-material-components/style.css'
 import Card from 'preact-material-components/ts/Card'
 import IconButton from 'preact-material-components/ts/IconButton'
 import LayoutGrid from 'preact-material-components/ts/LayoutGrid'
-import { useState, useRef } from 'preact/hooks'
+import { useState } from 'preact/hooks'
+import TelegramIcon from './icons/telegram.png'
 import * as NETWORK from './network'
 import { Meeting } from './network'
 import NoImage from './no.png'
-import TelegramIcon from './icons/telegram.png'
 import uuid = require('uuid')
 
 
@@ -51,22 +51,21 @@ type LayoutProps = { meeting: Meeting }
 const Layout = ({ meeting }: LayoutProps) => {
   const totalConversations = Object.keys(meeting.conversations).length;
 
-  const [{ width: windowWidth, height: windowHeight }, setSize] = useState({ width: window.innerWidth, height: window.innerHeight })
-
   console.log(`totalConversations: ${totalConversations}`)
 
   const size1 = Math.ceil(Math.sqrt(totalConversations + 1));
-  const size2 = Math.ceil((Math.max(1, totalConversations)) / size1);
+  const size2 = Math.max(1, Math.ceil(totalConversations / size1));
 
   console.log(`size: ${size1}x${size2}`)
 
-  const cols = Math.min(4, Math.ceil(12 / size1)) as LayoutCols;
-  const alignCols = Math.ceil((12 - cols) / 2) as LayoutCols
+  const desktopCols = Math.min(6, Math.ceil(12 / size1)) as LayoutCols
+  const desktopAlignCols = Math.ceil((12 - desktopCols) / 2) + 1 as LayoutCols
 
-  const maxWidth = px(windowWidth / size1);
-  const maxHeight = px(windowHeight / size2);
+  const tabletCols = 3
+  const tabletAlignCols = 3
 
-  window.onresize = () => setSize({ width: window.innerWidth, height: window.innerHeight })
+  const phoneCols = 4
+  const phoneAlignCols = 1
 
   const VideoCard = ({ stream }) => {
     return (
@@ -80,12 +79,19 @@ const Layout = ({ meeting }: LayoutProps) => {
     <LayoutGrid>
       <LayoutGrid.Inner >
         {Object.values(meeting.conversations).map(({ stream }) => (
-          <LayoutGrid.Cell cols={cols} align="middle">
+          <LayoutGrid.Cell
+            desktopCols={desktopCols}
+            tabletCols={tabletCols}
+            phoneCols={phoneCols}
+            align="middle">
             <VideoCard stream={stream} />
           </LayoutGrid.Cell>
         ))}
-        {totalConversations % 2 === 0 ? <LayoutGrid.Cell cols={alignCols} /> : null}
-        <LayoutGrid.Cell align="bottom" cols={1} />
+        {totalConversations % 2 === 0 ?
+          <LayoutGrid.Cell
+            desktopCols={desktopAlignCols}
+            tabletCols={tabletAlignCols}
+            phoneCols={phoneAlignCols} /> : null}
         <LayoutGrid.Cell align="bottom" cols={1}>
           <IconButton onClick={() => copy(meeting)}>
             <IconButton.Icon>link</IconButton.Icon>
@@ -97,7 +103,7 @@ const Layout = ({ meeting }: LayoutProps) => {
             <img src={TelegramIcon} style={{ height: '100%' }} />
           </IconButton>
         </LayoutGrid.Cell>
-        <LayoutGrid.Cell align="bottom" cols={cols - 2}>
+        <LayoutGrid.Cell align="bottom" cols={2}>
           <Card>
             <Video stream={meeting.stream} />
           </Card>
