@@ -183,9 +183,9 @@ async function handleControlMessage(
   const { peer, controlChannel } = conversation;
   const { network } = meeting
 
-  const { to, type } = message
+  const { to } = message
 
-  if (to && to !== network.id && type === "join") {
+  if (to && to !== network.id) {
     if (network.peers.includes(to)) {
       sendControlMessage(meeting.conversations[to], message);
     } else {
