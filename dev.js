@@ -1,7 +1,11 @@
+var opn = require('opn');
+
 process.env.DEV = '1'
 
 let peerUpdated = true
 let beaconUpdated = true
+
+opn('https://localhost:8082/');
 
 function log(message) {
   console.log(new Date(), message)
@@ -14,13 +18,13 @@ function runEvery(operation, interval) {
   }, interval)
 }
 
-const decoder = new TextDecoder();
+//const decoder = new TextDecoder();
 
 const { exec, execSync } = require('child_process')
 
 const startBeacon = () => {
   log('building beacon...')
-  console.log(decoder.decode(execSync("npm run build-beacon")))
+  console.log(/*decoder.decode(*/execSync("npm run build-beacon")/*)*/)
   log('starting beacon')
   return exec('npm start')
 }
@@ -33,7 +37,7 @@ runEvery(async () => {
     try {
       log('updating peer...')
       const output = execSync("npm run build-peer");
-      log(`peer updates:\n${decoder.decode(output)}`)
+      log(`peer updates:\n${/*decoder.decode(*/output/*)*/}`)
     } catch (error) {
       log(`peer update failed: ${error.toString()}`)
     }
