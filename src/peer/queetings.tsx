@@ -9,6 +9,7 @@ import * as NETWORK from './network'
 import { Meeting } from './network'
 import NoImage from './no.png'
 import uuid = require('uuid')
+import './style.scss';
 
 
 type PhoneCols = 1 | 2 | 3 | 4;
@@ -76,8 +77,8 @@ const Layout = ({ meeting }: LayoutProps) => {
   }
 
   return (
-    <LayoutGrid>
-      <LayoutGrid.Inner >
+    <LayoutGrid class={'grid'}>
+      <LayoutGrid.Inner class={'gridInner'} >
         {Object.values(meeting.conversations).map(({ stream }) => (
           <LayoutGrid.Cell
             desktopCols={desktopCols}
@@ -93,19 +94,21 @@ const Layout = ({ meeting }: LayoutProps) => {
             tabletCols={tabletAlignCols}
             phoneCols={phoneAlignCols} /> : null}
         <LayoutGrid.Cell align="bottom" cols={1}>
-          <IconButton onClick={() => copy(meeting)}>
-            <IconButton.Icon>link</IconButton.Icon>
-          </IconButton>
-          <IconButton onClick={() => email(meeting)}>
-            <IconButton.Icon>alternate_email</IconButton.Icon>
-          </IconButton>
-          <IconButton onClick={() => telegram(meeting)}>
-            <img src={TelegramIcon} style={{ height: '100%' }} />
-          </IconButton>
         </LayoutGrid.Cell>
         <LayoutGrid.Cell align="bottom" cols={2}>
-          <Card>
-            <Video stream={meeting.stream} />
+          <Card class={'cardSelfVideo'}>
+            <Video stream={meeting.stream} muted={true} />
+            <LayoutGrid.Cell align="bottom" class={'controlButton'}>
+              <IconButton onClick={() => copy(meeting)} >
+                <IconButton.Icon>link</IconButton.Icon>
+              </IconButton>
+              <IconButton onClick={() => email(meeting)}>
+                <IconButton.Icon>alternate_email</IconButton.Icon>
+              </IconButton>
+              <IconButton onClick={() => telegram(meeting)}>
+                <img src={TelegramIcon} style={{ height: '100%' }} />
+              </IconButton>
+            </LayoutGrid.Cell>
           </Card>
         </LayoutGrid.Cell>
       </LayoutGrid.Inner>

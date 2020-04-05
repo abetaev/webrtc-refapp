@@ -17,6 +17,7 @@
   "license": "ISC",
   "dependencies": {
     "node-static": "^0.7.11",
+    "opn": "^6.0.0",
     "stun": "^2.1.0",
     "uuid": "^3.4.0",
     "ws": "^7.2.1"
@@ -31,6 +32,7 @@
     "parcel-bundler": "^1.12.4",
     "preact": "^10.3.1",
     "preact-material-components": "^1.6.1",
+    "sass": "^1.26.3",
     "typescript": "^3.7.5",
     "webrtc-adapter": "^7.5.0"
   }
